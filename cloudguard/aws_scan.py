@@ -5,6 +5,8 @@ from cloudguard.collectors.ec2 import EC2Collector
 from cloudguard.collectors.iam import IAMCollector
 from cloudguard.collectors.s3 import S3Collector
 from cloudguard.collectors.sts import STSCollector
+from cloudguard.findings.classifier import ResourceClassifier
+from cloudguard.findings.engine import FindingEngine
 from cloudguard.graph.attack_paths import AttackPathEngine
 from cloudguard.graph.aws_graph import AWSGraphBuilder
 from cloudguard.normalizers.aws import AWSNormalizer
@@ -15,21 +17,21 @@ def main() -> None:
     print("=" * 60)
 
     try:
+        # --------------------------------------------------
+        # AWS SESSION
+        # --------------------------------------------------
+
         session = AWSSession(
             profile_name="cloudguard",
             region_name="us-east-1",
         )
-
-        # --------------------------------------------------
-        # Identity
-        # --------------------------------------------------
 
         identity = STSCollector(
             session
         ).get_identity()
 
         # --------------------------------------------------
-        # Collection
+        # COLLECTION
         # --------------------------------------------------
 
         ec2_collector = EC2Collector(session)
@@ -61,7 +63,7 @@ def main() -> None:
         )
 
         # --------------------------------------------------
-        # Normalization
+        # NORMALIZATION
         # --------------------------------------------------
 
         normalizer = AWSNormalizer()
@@ -97,7 +99,17 @@ def main() -> None:
         )
 
         # --------------------------------------------------
-        # Security Graph
+        # RESOURCE CLASSIFICATION
+        # --------------------------------------------------
+
+        classifier = ResourceClassifier()
+
+        assets = classifier.classify(
+            assets
+        )
+
+        # --------------------------------------------------
+        # SECURITY GRAPH
         # --------------------------------------------------
 
         graph_builder = AWSGraphBuilder()
@@ -111,19 +123,61 @@ def main() -> None:
         )
 
         # --------------------------------------------------
-        # Attack Path Analysis
+        # ATTACK PATH ANALYSIS
         # --------------------------------------------------
 
         attack_engine = AttackPathEngine(
             security_graph
         )
 
-        paths = (
+        attack_paths = (
             attack_engine.find_paths_to_sensitive_assets()
         )
 
         # --------------------------------------------------
-        # Results
+        # FINDING ANALYSIS
+        # --------------------------------------------------
+
+        finding_engine = FindingEngine()
+
+        findings = finding_engine.analyze(
+            security_graph
+        )
+
+        # --------------------------------------------------
+        # RISK SUMMARY
+        # --------------------------------------------------
+
+        highest_risk_score = max(
+            (
+                finding.risk_score
+                for finding in findings
+            ),
+            default=0,
+        )
+
+        critical_count = sum(
+            finding.severity.value == "CRITICAL"
+            for finding in findings
+        )
+
+        high_count = sum(
+            finding.severity.value == "HIGH"
+            for finding in findings
+        )
+
+        medium_count = sum(
+            finding.severity.value == "MEDIUM"
+            for finding in findings
+        )
+
+        low_count = sum(
+            finding.severity.value == "LOW"
+            for finding in findings
+        )
+
+        # --------------------------------------------------
+        # INVENTORY OUTPUT
         # --------------------------------------------------
 
         print("\nInventory")
@@ -132,21 +186,31 @@ def main() -> None:
         print(
             f"EC2 instances:       {len(instances)}"
         )
+
         print(
             f"Security groups:     {len(security_groups)}"
         )
+
         print(
             f"S3 buckets:          {len(buckets)}"
         )
+
         print(
             f"IAM users:           {len(users)}"
         )
+
         print(
             f"IAM roles:           {len(roles)}"
         )
+
         print(
-            f"Instance profiles:   {len(instance_profiles)}"
+            f"Instance profiles:   "
+            f"{len(instance_profiles)}"
         )
+
+        # --------------------------------------------------
+        # GRAPH OUTPUT
+        # --------------------------------------------------
 
         print("\nSecurity Graph")
         print("-" * 60)
@@ -162,21 +226,131 @@ def main() -> None:
         )
 
         print(
-            f"Attack paths:        {len(paths)}"
+            f"Attack paths:        "
+            f"{len(attack_paths)}"
         )
 
         # --------------------------------------------------
-        # Attack Paths
+        # SECURITY SUMMARY
         # --------------------------------------------------
 
-        if not paths:
+        print("\nSecurity Summary")
+        print("-" * 60)
+
+        print(
+            f"Findings:            {len(findings)}"
+        )
+
+        print(
+            f"Critical:            {critical_count}"
+        )
+
+        print(
+            f"High:                {high_count}"
+        )
+
+        print(
+            f"Medium:              {medium_count}"
+        )
+
+        print(
+            f"Low:                 {low_count}"
+        )
+
+        print(
+            f"Highest risk score:  "
+            f"{highest_risk_score}/100"
+        )
+
+        # --------------------------------------------------
+        # FINDINGS OUTPUT
+        # --------------------------------------------------
+
+        if not findings:
             print(
-                "\nNo attack paths to sensitive "
-                "assets were discovered."
+                "\nNo security findings were discovered."
             )
 
+        for number, finding in enumerate(
+            findings,
+            start=1,
+        ):
+            print(
+                f"\nFINDING {number}"
+            )
+
+            print("-" * 60)
+
+            print(
+                f"ID:       {finding.id}"
+            )
+
+            print(
+                f"Severity: {finding.severity.value}"
+            )
+
+            print(
+                f"Category: {finding.category.value}"
+            )
+
+            print(
+                f"Risk:     {finding.risk_score}/100"
+            )
+
+            print(
+                f"Title:    {finding.title}"
+            )
+
+            print(
+                f"\n{finding.description}"
+            )
+
+            if finding.affected_assets:
+                print(
+                    "\nAffected assets:"
+                )
+
+                for asset_id in (
+                    finding.affected_assets
+                ):
+                    print(
+                        f"  - {asset_id}"
+                    )
+
+            if finding.evidence:
+                print(
+                    "\nEvidence:"
+                )
+
+                for evidence in (
+                    finding.evidence
+                ):
+                    print(
+                        f"  - {evidence}"
+                    )
+
+            if finding.remediation:
+                print(
+                    "\nRemediation:"
+                )
+
+                print(
+                    f"  {finding.remediation}"
+                )
+
+        # --------------------------------------------------
+        # ATTACK PATH DETAILS
+        # --------------------------------------------------
+
+        if attack_paths:
+            print(
+                "\nAttack Paths"
+            )
+
+            print("=" * 60)
+
         for number, path in enumerate(
-            paths,
+            attack_paths,
             start=1,
         ):
             print(
@@ -216,9 +390,7 @@ def main() -> None:
                         path.relationships[index]
                     )
 
-                    print(
-                        "   |"
-                    )
+                    print("   |")
 
                     print(
                         "   | "
@@ -239,9 +411,7 @@ def main() -> None:
                             f"{relationship.evidence}"
                         )
 
-                    print(
-                        "   v"
-                    )
+                    print("   v")
 
             print(
                 f"\nPath length: "
@@ -249,9 +419,7 @@ def main() -> None:
             )
 
     except ClientError as error:
-        print(
-            "\nAWS ERROR"
-        )
+        print("\nAWS ERROR")
 
         print(
             error.response["Error"]["Code"],
