@@ -1,6 +1,27 @@
-from fastapi import APIRouter
+from io import BytesIO
 
-from cloudguard.services.analysis import AnalysisService
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+
+from cloudguard.local_lab import LocalAWSLab
+from cloudguard.reporting.engine import (
+    SecurityReportEngine,
+)
+from cloudguard.reporting.pdf import (
+    SecurityReportPDF,
+)
+from cloudguard.services.analysis import (
+    AnalysisService,
+)
+from cloudguard.services.compliance_analysis import (
+    ComplianceAnalysisService,
+)
+from cloudguard.services.identity_analysis import (
+    IdentityAnalysisService,
+)
+from cloudguard.services.network_analysis import (
+    NetworkAnalysisService,
+)
 
 
 router = APIRouter(
@@ -9,6 +30,76 @@ router = APIRouter(
 )
 
 analysis_service = AnalysisService()
+
+identity_analysis_service = (
+    IdentityAnalysisService()
+)
+
+network_analysis_service = (
+    NetworkAnalysisService()
+)
+
+compliance_analysis_service = (
+    ComplianceAnalysisService()
+)
+
+report_engine = SecurityReportEngine()
+
+pdf_renderer = SecurityReportPDF()
+
+
+def build_security_report():
+    """
+    Build the complete CloudGuard security report
+    from the current local assessment.
+
+    The same report model powers both the JSON
+    endpoint and the PDF export.
+    """
+
+    result = (
+        analysis_service
+        .analyze_local_lab()
+    )
+
+    identities = (
+        identity_analysis_service
+        .analyze(result)
+    )
+
+    lab = LocalAWSLab()
+
+    (
+        instances,
+        security_groups,
+        _,
+        _,
+        _,
+    ) = lab.create_environment()
+
+    network_risks = (
+        network_analysis_service.analyze(
+            analysis_result=result,
+            instances=instances,
+            security_groups=(
+                security_groups
+            ),
+        )
+    )
+
+    compliance_report = (
+        compliance_analysis_service
+        .analyze(result)
+    )
+
+    return report_engine.build(
+        analysis_result=result,
+        identity_risks=identities,
+        network_risks=network_risks,
+        compliance_report=(
+            compliance_report
+        ),
+    )
 
 
 @router.get("/overview")
@@ -131,8 +222,7 @@ def get_relationships() -> list[dict]:
     relationships = []
 
     for source, target in (
-        result.security_graph
-        .graph.edges
+        result.security_graph.graph.edges
     ):
         relationship = (
             result.security_graph
@@ -190,3 +280,144 @@ def get_attack_paths() -> list[dict]:
         )
         for path in result.attack_paths
     ]
+
+
+@router.get("/identity-risks")
+def get_identity_risks() -> list[dict]:
+    """
+    Returns contextual IAM identity risk analysis.
+
+    Results are based on CloudGuard's observed
+    assets, relationships, permissions, and
+    attack paths.
+    """
+
+    result = (
+        analysis_service
+        .analyze_local_lab()
+    )
+
+    identities = (
+        identity_analysis_service
+        .analyze(result)
+    )
+
+    return [
+        identity.to_dict()
+        for identity in identities
+    ]
+
+
+@router.get("/network-risks")
+def get_network_risks() -> list[dict]:
+    """
+    Returns contextual network exposure risk.
+
+    The local endpoint analyzes CloudGuard's
+    simulated AWS environment and performs no
+    AWS API calls.
+    """
+
+    result = (
+        analysis_service
+        .analyze_local_lab()
+    )
+
+    lab = LocalAWSLab()
+
+    (
+        instances,
+        security_groups,
+        _,
+        _,
+        _,
+    ) = lab.create_environment()
+
+    network_risks = (
+        network_analysis_service.analyze(
+            analysis_result=result,
+            instances=instances,
+            security_groups=(
+                security_groups
+            ),
+        )
+    )
+
+    return [
+        risk.to_dict()
+        for risk in network_risks
+    ]
+
+
+@router.get("/compliance")
+def get_compliance() -> dict:
+    """
+    Returns evidence-based compliance mappings.
+
+    This endpoint does not represent a complete
+    certification or full framework audit.
+    """
+
+    result = (
+        analysis_service
+        .analyze_local_lab()
+    )
+
+    report = (
+        compliance_analysis_service
+        .analyze(result)
+    )
+
+    return report.model_dump(
+        mode="json"
+    )
+
+
+@router.get("/report")
+def get_security_report() -> dict:
+    """
+    Returns CloudGuard's consolidated security
+    assessment as structured JSON.
+    """
+
+    report = build_security_report()
+
+    return report.model_dump(
+        mode="json"
+    )
+
+
+@router.get("/report/pdf")
+def get_security_report_pdf():
+    """
+    Generates the CloudGuard security assessment
+    as a downloadable PDF.
+
+    The PDF is rendered from the same structured
+    report used by the JSON report endpoint.
+    """
+
+    report = build_security_report()
+
+    pdf_bytes = pdf_renderer.build(
+        report
+    )
+
+    pdf_stream = BytesIO(
+        pdf_bytes
+    )
+
+    return StreamingResponse(
+        pdf_stream,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                "attachment; "
+                "filename="
+                "\"CloudGuard-Security-Assessment.pdf\""
+            ),
+            "Content-Length": str(
+                len(pdf_bytes)
+            ),
+        },
+    )
