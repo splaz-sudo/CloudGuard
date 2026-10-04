@@ -15,6 +15,7 @@ import Identity from "./pages/Identity";
 import Inventory from "./pages/Inventory";
 import Network from "./pages/Network";
 import Overview from "./pages/Overview";
+import Remediations from "./pages/Remediations";
 import Reports from "./pages/Reports";
 
 
@@ -51,6 +52,11 @@ function App() {
           <Route
             path="/findings"
             element={<Findings />}
+          />
+
+          <Route
+            path="/remediations"
+            element={<Remediations />}
           />
 
           <Route

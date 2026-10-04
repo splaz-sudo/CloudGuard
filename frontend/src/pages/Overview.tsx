@@ -6,11 +6,13 @@ import {
 
 import {
   CloudGuardAPIError,
+  getAttackPaths,
   getFindings,
   getOverview,
 } from "../services/api";
 
 import type {
+  AttackPath,
   Finding,
   Overview as OverviewData,
 } from "../types/cloudguard";
@@ -22,6 +24,9 @@ function Overview() {
 
   const [findings, setFindings] =
     useState<Finding[]>([]);
+
+  const [attackPaths, setAttackPaths] =
+    useState<AttackPath[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -38,13 +43,16 @@ function Overview() {
         const [
           overviewData,
           findingsData,
+          attackPathData,
         ] = await Promise.all([
           getOverview(),
           getFindings(),
+          getAttackPaths(),
         ]);
 
         setOverview(overviewData);
         setFindings(findingsData);
+        setAttackPaths(attackPathData);
       } catch (requestError) {
         if (
           requestError
@@ -134,7 +142,7 @@ function Overview() {
         </div>
 
         <div className="environment-badge">
-          LOCAL LAB
+          {environmentLabel(overview.mode)}
         </div>
       </header>
 
@@ -181,7 +189,7 @@ function Overview() {
             </div>
 
             <span className="live-label">
-              LIVE
+              {dataLabel(overview.mode)}
             </span>
           </div>
 
@@ -236,41 +244,53 @@ function Overview() {
             </div>
           </div>
 
-          <div className="attack-summary">
-            <div className="attack-node">
-              Internet
-            </div>
+          {attackPaths.length === 0 ? (
+            <p className="attack-description">
+              No attack paths to sensitive
+              resources were discovered in the
+              current analysis.
+            </p>
+          ) : (
+            <>
+              <div className="attack-summary">
+                {attackPaths[0].nodes.map(
+                  (node, nodeIndex) => (
+                    <span
+                      key={`${node}-${nodeIndex}`}
+                      className="attack-chain-item"
+                    >
+                      {nodeIndex > 0 && (
+                        <span className="arrow">
+                          →
+                        </span>
+                      )}
 
-            <span className="arrow">
-              →
-            </span>
+                      <div
+                        className={
+                          nodeIndex ===
+                            attackPaths[0]
+                              .nodes
+                              .length -
+                              1 &&
+                          attackPaths[0]
+                            .sensitive_target
+                            ? "attack-node sensitive"
+                            : "attack-node"
+                        }
+                        title={node}
+                      >
+                        {shortNodeLabel(node)}
+                      </div>
+                    </span>
+                  ),
+                )}
+              </div>
 
-            <div className="attack-node">
-              EC2
-            </div>
-
-            <span className="arrow">
-              →
-            </span>
-
-            <div className="attack-node">
-              IAM Role
-            </div>
-
-            <span className="arrow">
-              →
-            </span>
-
-            <div className="attack-node sensitive">
-              S3
-            </div>
-          </div>
-
-          <p className="attack-description">
-            CloudGuard discovered a reachable
-            path from the public internet to a
-            sensitive storage resource.
-          </p>
+              <p className="attack-description">
+                {attackPaths[0].explanation}
+              </p>
+            </>
+          )}
         </article>
       </section>
 
@@ -343,6 +363,34 @@ function Overview() {
       </section>
     </>
   );
+}
+
+
+function environmentLabel(
+  mode: string,
+) {
+  return mode === "local"
+    ? "LOCAL LAB"
+    : "AWS SCAN";
+}
+
+
+function dataLabel(mode: string) {
+  return mode === "local"
+    ? "SIMULATED DATA"
+    : "SCAN RESULT";
+}
+
+
+function shortNodeLabel(node: string) {
+  const separatorIndex =
+    node.indexOf(":");
+
+  if (separatorIndex === -1) {
+    return node;
+  }
+
+  return node.slice(separatorIndex + 1);
 }
 
 

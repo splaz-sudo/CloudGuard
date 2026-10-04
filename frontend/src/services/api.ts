@@ -7,7 +7,9 @@ import type {
   NetworkRisk,
   Overview,
   Relationship,
+  Remediation,
   SecurityReport,
+  SimulationResult,
 } from "../types/cloudguard";
 
 
@@ -48,6 +50,7 @@ function getErrorMessage(
 async function request<T>(
   endpoint: string,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  method: "GET" | "POST" = "GET",
 ): Promise<T> {
   const controller = new AbortController();
 
@@ -63,7 +66,7 @@ async function request<T>(
       response = await fetch(
         `${API_BASE_URL}${endpoint}`,
         {
-          method: "GET",
+          method,
           headers: {
             Accept: "application/json",
           },
@@ -246,5 +249,36 @@ export function getSecurityReport(): Promise<
 > {
   return request<SecurityReport>(
     "/api/report",
+  );
+}
+
+
+export function getRemediations(): Promise<
+  Remediation[]
+> {
+  return request<Remediation[]>(
+    "/api/remediations",
+  );
+}
+
+
+export function getPrioritizedRemediations(): Promise<
+  Remediation[]
+> {
+  return request<Remediation[]>(
+    "/api/remediations/prioritized",
+  );
+}
+
+
+export function simulateRemediation(
+  remediationId: string,
+): Promise<SimulationResult> {
+  return request<SimulationResult>(
+    "/api/remediations/"
+      + `${encodeURIComponent(remediationId)}`
+      + "/simulate",
+    DEFAULT_TIMEOUT_MS,
+    "POST",
   );
 }

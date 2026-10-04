@@ -75,6 +75,19 @@ export interface Relationship {
   relationship_type: RelationshipType;
   permissions: string[];
   evidence: string | null;
+  relationship_id: string;
+}
+
+
+export interface AttackPathHop {
+  source: string;
+  target: string;
+  relationship_type: RelationshipType;
+  reason: string;
+  evidence: string | null;
+  configuration: string | null;
+  impact: string | null;
+  permissions: string[];
 }
 
 
@@ -85,6 +98,66 @@ export interface AttackPath {
   hop_count: number;
   sensitive_target: boolean;
   relationships: Relationship[];
+  path_id: string;
+  severity: string;
+  risk_score: number;
+  hops: AttackPathHop[];
+  explanation: string;
+}
+
+
+export type RemediationActionType =
+  | "restrict_network_exposure"
+  | "reduce_iam_permission"
+  | "remove_role_attachment"
+  | "restrict_resource_access";
+
+
+export interface Remediation {
+  remediation_id: string;
+  title: string;
+  description: string;
+  action_type: RemediationActionType;
+  affected_resources: string[];
+  finding_ids: string[];
+  attack_path_ids: string[];
+  relationship_ids: string[];
+  evidence: string[];
+  manual_steps: string[];
+  expected_effect: string;
+  priority: number | null;
+  paths_affected: number;
+  paths_removed: number | null;
+  risk_before: number | null;
+  risk_after: number | null;
+  risk_reduction: number | null;
+  risk_reduction_percent: number | null;
+}
+
+
+export interface SimulationStateSummary {
+  highest_risk: number;
+  attack_paths: number;
+  findings: number;
+}
+
+
+export interface SimulationImpact {
+  paths_removed: number;
+  removed_path_ids: string[];
+  risk_reduction: number;
+  risk_reduction_percent: number;
+}
+
+
+export interface SimulationResult {
+  remediation_id: string;
+  action_type: RemediationActionType;
+  simulation_only: boolean;
+  note: string;
+  before: SimulationStateSummary;
+  after: SimulationStateSummary;
+  impact: SimulationImpact;
 }
 
 
