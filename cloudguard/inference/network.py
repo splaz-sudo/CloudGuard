@@ -12,6 +12,9 @@ class InboundRule(BaseModel):
     to_port: int | None = None
     sources: list[str] = Field(default_factory=list)
 
+    security_group_id: str | None = None
+    security_group_name: str | None = None
+
 
 class NetworkConfiguration(BaseModel):
     asset_id: str
@@ -59,9 +62,19 @@ class NetworkExposureAnalyzer:
                     source in self.INTERNET_CIDRS
                     for source in rule.sources
                 ):
-                    exposed_rules.append(
+                    rule_description = (
                         f"{rule.protocol}:"
                         f"{rule.from_port}-{rule.to_port}"
+                    )
+
+                    if rule.security_group_id:
+                        rule_description += (
+                            f" (security group "
+                            f"{rule.security_group_id})"
+                        )
+
+                    exposed_rules.append(
+                        rule_description
                     )
 
             evidence = (

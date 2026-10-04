@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class RelationshipType(str, Enum):
@@ -22,3 +22,20 @@ class Relationship(BaseModel):
     permissions: list[str] = Field(default_factory=list)
 
     evidence: str | None = None
+
+    @computed_field
+    @property
+    def relationship_id(self) -> str:
+        """
+        Stable identifier derived from the
+        relationship's endpoints and type.
+
+        Deterministic for a given environment, so
+        remediations and scans can reference the
+        same relationship reliably.
+        """
+        return (
+            f"{self.source}"
+            f"->{self.target}"
+            f":{self.relationship_type.value}"
+        )

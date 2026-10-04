@@ -1,6 +1,17 @@
-import networkx as nx
-from pydantic import BaseModel
+import hashlib
 
+import networkx as nx
+from pydantic import BaseModel, Field
+
+from cloudguard.findings.scoring import (
+    ATTACK_PATH_TO_SENSITIVE_SCORE,
+    severity_from_score,
+)
+from cloudguard.graph.explanations import (
+    AttackPathHop,
+    explain_hop,
+    explain_path_summary,
+)
 from cloudguard.graph.security_graph import SecurityGraph
 from cloudguard.models.assets import CloudAsset
 from cloudguard.models.relationships import Relationship
@@ -13,6 +24,14 @@ class AttackPath(BaseModel):
     hop_count: int
     sensitive_target: bool
     relationships: list[Relationship]
+
+    path_id: str = ""
+    severity: str = "INFO"
+    risk_score: int = 0
+    hops: list[AttackPathHop] = Field(
+        default_factory=list
+    )
+    explanation: str = ""
 
 
 class AttackPathEngine:
@@ -56,18 +75,52 @@ class AttackPathEngine:
 
             target_asset = self.security_graph.get_asset(target)
 
+            sensitive_target = bool(
+                target_asset and target_asset.sensitive
+            )
+
             results.append(
                 AttackPath(
                     source=source,
                     target=target,
                     nodes=node_path,
                     hop_count=len(node_path) - 1,
-                    sensitive_target=bool(
-                        target_asset and target_asset.sensitive
-                    ),
+                    sensitive_target=sensitive_target,
                     relationships=relationships,
+                    path_id=_path_id(node_path),
+                    severity=(
+                        severity_from_score(
+                            ATTACK_PATH_TO_SENSITIVE_SCORE
+                        )
+                        if sensitive_target
+                        else "INFO"
+                    ),
+                    risk_score=(
+                        ATTACK_PATH_TO_SENSITIVE_SCORE
+                        if sensitive_target
+                        else 0
+                    ),
+                    hops=self._explain_hops(
+                        node_path,
+                        relationships,
+                    ),
+                    explanation=(
+                        explain_path_summary(
+                            source,
+                            target,
+                            len(node_path) - 1,
+                            sensitive_target,
+                        )
+                    ),
                 )
             )
+
+        results.sort(
+            key=lambda path: (
+                path.target,
+                path.nodes,
+            )
+        )
 
         return results
 
@@ -99,3 +152,51 @@ class AttackPathEngine:
             )
 
         return results
+
+    def _explain_hops(
+        self,
+        node_path: list[str],
+        relationships: list[Relationship],
+    ) -> list[AttackPathHop]:
+
+        hops: list[AttackPathHop] = []
+
+        for index, relationship in enumerate(
+            relationships
+        ):
+            source_asset = (
+                self.security_graph.get_asset(
+                    node_path[index]
+                )
+            )
+
+            target_asset = (
+                self.security_graph.get_asset(
+                    node_path[index + 1]
+                )
+            )
+
+            hops.append(
+                explain_hop(
+                    relationship,
+                    source_asset,
+                    target_asset,
+                )
+            )
+
+        return hops
+
+
+def _path_id(node_path: list[str]) -> str:
+    """
+    Stable, content-derived path identifier.
+
+    Deterministic for a given node sequence so
+    findings, remediations, and scan comparisons
+    can reference the same path.
+    """
+    digest = hashlib.sha1(
+        ">".join(node_path).encode("utf-8")
+    ).hexdigest()
+
+    return f"PATH-{digest[:12]}"

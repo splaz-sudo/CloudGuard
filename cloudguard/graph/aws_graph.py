@@ -122,6 +122,12 @@ class AWSGraphBuilder:
                             from_port=rule.from_port,
                             to_port=rule.to_port,
                             sources=rule.sources,
+                            security_group_id=(
+                                group.group_id
+                            ),
+                            security_group_name=(
+                                group.group_name
+                            ),
                         )
                     )
 

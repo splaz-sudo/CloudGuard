@@ -5,6 +5,10 @@ from cloudguard.findings.models import (
     FindingCategory,
     Severity,
 )
+from cloudguard.findings.scoring import (
+    ATTACK_PATH_TO_SENSITIVE_SCORE,
+    INTERNET_EXPOSED_WORKLOAD_SCORE,
+)
 from cloudguard.graph.security_graph import SecurityGraph
 from cloudguard.models.assets import AssetType
 from cloudguard.models.relationships import RelationshipType
@@ -101,7 +105,9 @@ class FindingEngine:
                         "to trusted networks and remove "
                         "unnecessary public exposure."
                     ),
-                    risk_score=80,
+                    risk_score=(
+                        INTERNET_EXPOSED_WORKLOAD_SCORE
+                    ),
                 )
             )
 
@@ -221,7 +227,9 @@ class FindingEngine:
                             "or isolating the sensitive "
                             "resource."
                         ),
-                        risk_score=95,
+                        risk_score=(
+                            ATTACK_PATH_TO_SENSITIVE_SCORE
+                        ),
                     )
                 )
 

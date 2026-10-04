@@ -107,9 +107,18 @@ class IAMPermissionEvaluator:
         resource_arn: str,
     ) -> bool:
 
+        # An object-level statement such as
+        # arn:aws:s3:::bucket/* also applies to
+        # the bucket asset itself.
+        candidates = {
+            resource_arn,
+            f"{resource_arn}/*",
+        }
+
         return any(
-            fnmatchcase(resource_arn, pattern)
+            fnmatchcase(candidate, pattern)
             for pattern in patterns
+            for candidate in candidates
         )
 
     def _relationship_type(
