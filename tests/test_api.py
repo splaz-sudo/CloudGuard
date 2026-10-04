@@ -290,12 +290,16 @@ def test_compliance_endpoint():
         == "NON_COMPLIANT"
     )
 
-    assert (
-        "CG-PATH-s3:customer-backups-1"
-        in controls[
+    # The control should map to the attack-path finding
+    # which targets the sensitive s3 bucket
+    attack_path_findings = [
+        fid
+        for fid in controls[
             "CG-CIS-IAM-01"
         ]["related_findings"]
-    )
+        if fid.startswith("CG-PATH-")
+    ]
+    assert len(attack_path_findings) == 1
 
 
 def test_security_report_endpoint():

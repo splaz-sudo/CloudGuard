@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from cloudguard.findings.scoring import (
+    severity_from_score,
+)
+
 
 @dataclass
 class ExposedService:
@@ -179,18 +183,12 @@ def calculate_network_risk(
         asset_id=asset_id,
         asset_name=asset_name,
         risk_score=score,
-        severity=_severity_from_score(
-            score
-        ),
+        severity=severity_from_score(score).lower(),
         public_ip=public_ip,
         security_groups=security_groups,
         exposed_services=exposed_services,
-        attached_identities=(
-            attached_identities
-        ),
-        sensitive_resources=(
-            sensitive_resources
-        ),
+        attached_identities=attached_identities,
+        sensitive_resources=sensitive_resources,
         attack_paths=attack_paths,
         risk_factors=risk_factors,
         metadata=metadata or {},
@@ -241,21 +239,3 @@ def _has_sensitive_exposure(
                 return True
 
     return False
-
-
-def _severity_from_score(
-    score: int,
-) -> str:
-    if score >= 90:
-        return "critical"
-
-    if score >= 70:
-        return "high"
-
-    if score >= 40:
-        return "medium"
-
-    if score > 0:
-        return "low"
-
-    return "info"

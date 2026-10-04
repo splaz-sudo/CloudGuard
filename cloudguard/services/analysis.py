@@ -145,7 +145,8 @@ class AnalysisService:
         finding_engine = FindingEngine()
 
         findings = finding_engine.analyze(
-            security_graph
+            security_graph,
+            attack_paths=attack_paths,
         )
 
         return AnalysisResult(

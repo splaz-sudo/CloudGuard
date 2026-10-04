@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from cloudguard.findings.scoring import (
+    severity_from_score,
+)
+
 
 IDENTITY_TYPES = {
     "iam_role",
@@ -160,9 +164,7 @@ def calculate_identity_risk(
 
     score = min(score, 100)
 
-    severity = _severity_from_score(
-        score
-    )
+    severity = severity_from_score(score).lower()
 
     return IdentityRisk(
         identity_id=identity_id,
@@ -210,21 +212,3 @@ def _has_broad_permissions(
             return True
 
     return False
-
-
-def _severity_from_score(
-    score: int,
-) -> str:
-    if score >= 90:
-        return "critical"
-
-    if score >= 70:
-        return "high"
-
-    if score >= 40:
-        return "medium"
-
-    if score > 0:
-        return "low"
-
-    return "info"

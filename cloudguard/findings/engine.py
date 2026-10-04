@@ -1,3 +1,5 @@
+from typing import Optional
+
 import networkx as nx
 
 from cloudguard.findings.fingerprints import (
@@ -13,6 +15,7 @@ from cloudguard.findings.scoring import (
     ATTACK_PATH_TO_SENSITIVE_SCORE,
     INTERNET_EXPOSED_WORKLOAD_SCORE,
 )
+from cloudguard.graph.attack_paths import AttackPath
 from cloudguard.graph.security_graph import SecurityGraph
 from cloudguard.models.assets import AssetType
 from cloudguard.models.relationships import RelationshipType
@@ -27,6 +30,7 @@ class FindingEngine:
     def analyze(
         self,
         security_graph: SecurityGraph,
+        attack_paths: Optional[list[AttackPath]] = None,
     ) -> list[Finding]:
         findings: list[Finding] = []
 
@@ -36,11 +40,18 @@ class FindingEngine:
             )
         )
 
-        findings.extend(
-            self._find_sensitive_attack_paths(
-                security_graph
+        if attack_paths is not None:
+            findings.extend(
+                self._find_sensitive_attack_paths_from_paths(
+                    attack_paths
+                )
             )
-        )
+        else:
+            findings.extend(
+                self._find_sensitive_attack_paths(
+                    security_graph
+                )
+            )
 
         return findings
 
@@ -116,6 +127,75 @@ class FindingEngine:
                         network_exposure_fingerprint(
                             target_id
                         )
+                    ),
+                )
+            )
+
+        return findings
+
+    def _find_sensitive_attack_paths_from_paths(
+        self,
+        attack_paths: list[AttackPath],
+    ) -> list[Finding]:
+        """
+        Creates attack-path findings from pre-computed
+        AttackPath objects. This avoids re-walking the
+        graph and ensures finding evidence matches the
+        canonical attack paths exactly.
+        """
+        findings: list[Finding] = []
+
+        for path in attack_paths:
+            if not path.sensitive_target:
+                continue
+
+            evidence: list[str] = []
+
+            for hop in path.hops:
+                evidence.append(
+                    f"{hop.source} "
+                    f"--"
+                    f"{hop.relationship_type.value}"
+                    f"--> "
+                    f"{hop.target}"
+                )
+
+                if hop.permissions:
+                    evidence.append(
+                        "Permissions: "
+                        + ", ".join(hop.permissions)
+                    )
+
+                if hop.evidence:
+                    evidence.append(hop.evidence)
+
+            findings.append(
+                Finding(
+                    id=f"CG-PATH-{path.target}-{path.path_id}",
+                    title=(
+                        "Internet attack path to "
+                        "sensitive resource"
+                    ),
+                    description=(
+                        "CloudGuard discovered a "
+                        "security relationship chain "
+                        "from the public internet to "
+                        "a sensitive cloud resource."
+                    ),
+                    severity=Severity.CRITICAL,
+                    category=FindingCategory.ATTACK_PATH,
+                    affected_assets=list(path.nodes),
+                    evidence=evidence,
+                    remediation=(
+                        "Break the attack path by "
+                        "restricting public exposure, "
+                        "reducing IAM permissions, "
+                        "or isolating the sensitive "
+                        "resource."
+                    ),
+                    risk_score=ATTACK_PATH_TO_SENSITIVE_SCORE,
+                    fingerprint=attack_path_fingerprint(
+                        list(path.nodes)
                     ),
                 )
             )
