@@ -1,81 +1,81 @@
 import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  CloudGuardAPIError,
-  getAttackPaths,
-  getFindings,
-  getOverview,
+  compareScans,
+  getScanAttackPaths,
+  getScanFindings,
+  getScanOverview,
 } from "../services/api";
 
+import {
+  useScanContext,
+} from "../context/ScanContext";
+
+import {
+  useApiQuery,
+} from "../hooks/useApiQuery";
+
 import type {
-  AttackPath,
-  Finding,
-  Overview as OverviewData,
+  ScanRecord,
 } from "../types/cloudguard";
 
 
 function Overview() {
-  const [overview, setOverview] =
-    useState<OverviewData | null>(null);
+  const { scans, selectedScan } =
+    useScanContext();
 
-  const [findings, setFindings] =
-    useState<Finding[]>([]);
+  const scanId =
+    selectedScan?.scan_id ?? null;
 
-  const [attackPaths, setAttackPaths] =
-    useState<AttackPath[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState<CloudGuardAPIError | null>(null);
-
-  const loadDashboard =
-    useCallback(async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const [
-          overviewData,
-          findingsData,
-          attackPathData,
-        ] = await Promise.all([
-          getOverview(),
-          getFindings(),
-          getAttackPaths(),
-        ]);
-
-        setOverview(overviewData);
-        setFindings(findingsData);
-        setAttackPaths(attackPathData);
-      } catch (requestError) {
-        if (
-          requestError
-          instanceof CloudGuardAPIError
-        ) {
-          setError(requestError);
-        } else {
-          setError(
-            new CloudGuardAPIError(
-              "Unable to load the CloudGuard dashboard.",
-            ),
-          );
-        }
-      } finally {
-        setLoading(false);
+  const dashboard = useApiQuery(
+    async () => {
+      if (!scanId) {
+        throw new Error(
+          "No scan selected.",
+        );
       }
-    }, []);
 
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+      const [
+        overview,
+        findings,
+        attackPaths,
+      ] = await Promise.all([
+        getScanOverview(scanId),
+        getScanFindings(scanId),
+        getScanAttackPaths(scanId),
+      ]);
 
-  if (loading) {
+      return {
+        overview,
+        findings,
+        attackPaths,
+      };
+    },
+    [scanId],
+  );
+
+  const previousScan = findPreviousScan(
+    scans,
+    selectedScan,
+  );
+
+  const delta = useApiQuery(
+    async () => {
+      if (
+        !scanId
+        || !previousScan
+      ) {
+        return null;
+      }
+
+      return compareScans(
+        previousScan.scan_id,
+        scanId,
+      );
+    },
+    [scanId, previousScan?.scan_id],
+  );
+
+
+  if (!scanId || dashboard.loading) {
     return (
       <section className="page-state">
         Analyzing cloud environment...
@@ -83,7 +83,8 @@ function Overview() {
     );
   }
 
-  if (error || !overview) {
+
+  if (dashboard.error || !dashboard.data) {
     return (
       <section className="page-state error-message">
         <div>
@@ -93,30 +94,33 @@ function Overview() {
 
           <p>
             The dashboard cannot connect to the
-            CloudGuard backend. Make sure the API
-            service is running, then try again.
+            CloudGuard backend. Make sure the
+            API service is running, then try
+            again.
           </p>
 
-          {error?.status && (
+          {dashboard.error?.status && (
             <p>
-              HTTP status: {error.status}
+              HTTP status:{" "}
+              {dashboard.error.status}
             </p>
           )}
 
-          {error?.requestId && (
+          {dashboard.error?.requestId && (
             <p>
               Request ID:{" "}
               <code>
-                {error.requestId}
+                {
+                  dashboard.error
+                    .requestId
+                }
               </code>
             </p>
           )}
 
           <button
             type="button"
-            onClick={() => {
-              void loadDashboard();
-            }}
+            onClick={dashboard.retry}
           >
             Retry
           </button>
@@ -124,6 +128,14 @@ function Overview() {
       </section>
     );
   }
+
+
+  const {
+    overview,
+    findings,
+    attackPaths,
+  } = dashboard.data;
+
 
   return (
     <>
@@ -136,8 +148,13 @@ function Overview() {
           <h2>Cloud Security Posture</h2>
 
           <p className="subtitle">
-            Contextual risk analysis across cloud
-            assets and relationships.
+            {overview.environment}
+            {" · "}
+            {overview.created_at
+              .replace("T", " ")
+              .slice(0, 16)}
+            {" · "}
+            <code>{overview.scan_id}</code>
           </p>
         </div>
 
@@ -149,8 +166,14 @@ function Overview() {
       <section className="metric-grid">
         <MetricCard
           label="Highest Risk"
-          value={overview.highest_risk_score}
-          detail="/ 100"
+          value={
+            overview.highest_risk_score
+          }
+          detail={riskDeltaDetail(
+            delta.data?.risk_delta,
+            delta.loading,
+            previousScan !== null,
+          )}
           risk
         />
 
@@ -196,7 +219,9 @@ function Overview() {
           <div className="severity-list">
             <SeverityRow
               name="Critical"
-              value={overview.severity.critical}
+              value={
+                overview.severity.critical
+              }
               severity="critical"
             />
 
@@ -247,8 +272,8 @@ function Overview() {
           {attackPaths.length === 0 ? (
             <p className="attack-description">
               No attack paths to sensitive
-              resources were discovered in the
-              current analysis.
+              resources were discovered in
+              this scan.
             </p>
           ) : (
             <>
@@ -359,9 +384,82 @@ function Overview() {
               </div>
             </article>
           ))}
+
+          {findings.length === 0 && (
+            <p className="attack-description">
+              No findings were raised for this
+              scan.
+            </p>
+          )}
         </div>
       </section>
     </>
+  );
+}
+
+
+function findPreviousScan(
+  scans: ScanRecord[],
+  selectedScan: ScanRecord | null,
+): ScanRecord | null {
+  if (!selectedScan) {
+    return null;
+  }
+
+  const candidates = scans.filter(
+    (record) =>
+      record.scan_id
+        !== selectedScan.scan_id
+      && record.source
+        === selectedScan.source
+      && record.environment
+        === selectedScan.environment
+      && record.created_at
+        < selectedScan.created_at
+      && (
+        record.status === "completed"
+        || record.status === "partial"
+      ),
+  );
+
+  return candidates[0] ?? null;
+}
+
+
+function riskDeltaDetail(
+  riskDelta: number | null | undefined,
+  loading: boolean,
+  hasPrevious: boolean,
+): string {
+  if (!hasPrevious) {
+    return "/ 100";
+  }
+
+  if (loading) {
+    return "/ 100 · comparing...";
+  }
+
+  if (
+    riskDelta === null
+    || riskDelta === undefined
+  ) {
+    return "/ 100";
+  }
+
+  if (riskDelta === 0) {
+    return "/ 100 · unchanged";
+  }
+
+  if (riskDelta < 0) {
+    return (
+      `/ 100 · ↓ ${-riskDelta}`
+      + " since previous scan"
+    );
+  }
+
+  return (
+    `/ 100 · ↑ ${riskDelta}`
+    + " since previous scan"
   );
 }
 

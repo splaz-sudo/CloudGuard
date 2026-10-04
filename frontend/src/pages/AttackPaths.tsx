@@ -17,10 +17,14 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import {
-  getAssets,
-  getAttackPaths,
-  getRelationships,
+  getScanAssets,
+  getScanAttackPaths,
+  getScanRelationships,
 } from "../services/api";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   AttackPath,
@@ -36,6 +40,12 @@ type AssetNodeData = {
 
 
 function AttackPaths() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [assets, setAssets] =
     useState<CloudAsset[]>([]);
 
@@ -61,16 +71,25 @@ function AttackPaths() {
 
 
   useEffect(() => {
+    if (!scanId) {
+      return;
+    }
+
+    const currentScanId: string = scanId;
+
     async function loadGraph() {
+      setLoading(true);
+      setError(null);
+
       try {
         const [
           assetData,
           relationshipData,
           pathData,
         ] = await Promise.all([
-          getAssets(),
-          getRelationships(),
-          getAttackPaths(),
+          getScanAssets(currentScanId),
+          getScanRelationships(currentScanId),
+          getScanAttackPaths(currentScanId),
         ]);
 
         setAssets(assetData);
@@ -90,7 +109,7 @@ function AttackPaths() {
     }
 
     loadGraph();
-  }, []);
+  }, [scanId]);
 
 
   const attackPathNodeIds = useMemo(() => {

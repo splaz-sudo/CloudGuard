@@ -7,8 +7,10 @@ import {
 import "./App.css";
 
 import Layout from "./components/Layout";
+import { ScanProvider } from "./context/ScanContext";
 
 import AttackPaths from "./pages/AttackPaths";
+import Compare from "./pages/Compare";
 import Compliance from "./pages/Compliance";
 import Findings from "./pages/Findings";
 import Identity from "./pages/Identity";
@@ -17,59 +19,72 @@ import Network from "./pages/Network";
 import Overview from "./pages/Overview";
 import Remediations from "./pages/Remediations";
 import Reports from "./pages/Reports";
+import Scans from "./pages/Scans";
 
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route
-            path="/"
-            element={<Overview />}
-          />
+      <ScanProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route
+              path="/"
+              element={<Overview />}
+            />
 
-          <Route
-            path="/inventory"
-            element={<Inventory />}
-          />
+            <Route
+              path="/scans"
+              element={<Scans />}
+            />
 
-          <Route
-            path="/attack-paths"
-            element={<AttackPaths />}
-          />
+            <Route
+              path="/compare"
+              element={<Compare />}
+            />
 
-          <Route
-            path="/identity"
-            element={<Identity />}
-          />
+            <Route
+              path="/inventory"
+              element={<Inventory />}
+            />
 
-          <Route
-            path="/network"
-            element={<Network />}
-          />
+            <Route
+              path="/attack-paths"
+              element={<AttackPaths />}
+            />
 
-          <Route
-            path="/findings"
-            element={<Findings />}
-          />
+            <Route
+              path="/identity"
+              element={<Identity />}
+            />
 
-          <Route
-            path="/remediations"
-            element={<Remediations />}
-          />
+            <Route
+              path="/network"
+              element={<Network />}
+            />
 
-          <Route
-            path="/compliance"
-            element={<Compliance />}
-          />
+            <Route
+              path="/findings"
+              element={<Findings />}
+            />
 
-          <Route
-            path="/reports"
-            element={<Reports />}
-          />
-        </Route>
-      </Routes>
+            <Route
+              path="/remediations"
+              element={<Remediations />}
+            />
+
+            <Route
+              path="/compliance"
+              element={<Compliance />}
+            />
+
+            <Route
+              path="/reports"
+              element={<Reports />}
+            />
+          </Route>
+        </Routes>
+      </ScanProvider>
     </BrowserRouter>
   );
 }

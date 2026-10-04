@@ -3,6 +3,8 @@ import {
   Outlet,
 } from "react-router-dom";
 
+import { useScanContext } from "../context/ScanContext";
+
 
 function Layout() {
   const navClass = ({
@@ -26,6 +28,8 @@ function Layout() {
           </div>
         </div>
 
+        <ScanSelector />
+
         <nav className="navigation">
           <NavLink
             to="/"
@@ -33,6 +37,20 @@ function Layout() {
             className={navClass}
           >
             Overview
+          </NavLink>
+
+          <NavLink
+            to="/scans"
+            className={navClass}
+          >
+            Scans
+          </NavLink>
+
+          <NavLink
+            to="/compare"
+            className={navClass}
+          >
+            Compare
           </NavLink>
 
           <NavLink
@@ -101,7 +119,7 @@ function Layout() {
             </strong>
 
             <span>
-              Local simulation
+              Read-only
             </span>
           </div>
         </div>
@@ -111,6 +129,76 @@ function Layout() {
         <Outlet />
       </main>
     </div>
+  );
+}
+
+
+function ScanSelector() {
+  const {
+    scans,
+    selectedScan,
+    selectScan,
+  } = useScanContext();
+
+  if (!selectedScan) {
+    return null;
+  }
+
+  return (
+    <div className="scan-selector">
+      <label htmlFor="scan-selector">
+        VIEWING SCAN
+      </label>
+
+      <select
+        id="scan-selector"
+        value={selectedScan.scan_id}
+        onChange={(event) => {
+          selectScan(event.target.value);
+        }}
+      >
+        {scans.map((record) => (
+          <option
+            key={record.scan_id}
+            value={record.scan_id}
+          >
+            {formatScanOption(record)}
+          </option>
+        ))}
+      </select>
+
+      <span
+        className={
+          `scan-source-badge ${
+            selectedScan.source
+          }`
+        }
+      >
+        {selectedScan.source === "local_lab"
+          ? "LOCAL LAB"
+          : "AWS SCAN"}
+      </span>
+    </div>
+  );
+}
+
+
+function formatScanOption(
+  record: {
+    scan_id: string;
+    environment: string;
+    created_at: string;
+    status: string;
+  },
+) {
+  const timestamp = record.created_at
+    .replace("T", " ")
+    .slice(5, 16);
+
+  return (
+    `${record.environment} · `
+    + `${timestamp} · `
+    + record.scan_id.slice(0, 13)
   );
 }
 

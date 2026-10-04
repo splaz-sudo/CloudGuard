@@ -5,8 +5,12 @@ import {
 } from "react";
 
 import {
-  getNetworkRisks,
+  getScanNetworkRisks,
 } from "../services/api";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   ExposedService,
@@ -15,6 +19,12 @@ import type {
 
 
 function Network() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [risks, setRisks] =
     useState<NetworkRisk[]>([]);
 
@@ -33,15 +43,28 @@ function Network() {
 
 
   useEffect(() => {
+    if (!scanId) {
+      return;
+    }
+
+    const currentScanId: string = scanId;
+
     async function loadNetworkRisks() {
+      setLoading(true);
+      setError(null);
+
       try {
         const data =
-          await getNetworkRisks();
+          await getScanNetworkRisks(
+            currentScanId,
+          );
 
         setRisks(data);
 
         if (data.length > 0) {
           setSelectedRisk(data[0]);
+        } else {
+          setSelectedRisk(null);
         }
       } catch (requestError) {
         setError(
@@ -58,7 +81,7 @@ function Network() {
     }
 
     loadNetworkRisks();
-  }, []);
+  }, [scanId]);
 
 
   const metrics = useMemo(() => {

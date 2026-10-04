@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { getAssets } from "../services/api";
+import { useScanContext } from "../context/ScanContext";
+import { getScanAssets } from "../services/api";
 import type { CloudAsset } from "../types/cloudguard";
 
 
 function Inventory() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [assets, setAssets] =
     useState<CloudAsset[]>([]);
 
@@ -18,9 +25,20 @@ function Inventory() {
     useState<string | null>(null);
 
   useEffect(() => {
+    if (!scanId) {
+      return;
+    }
+
+    const currentScanId: string = scanId;
+
     async function loadAssets() {
+      setLoading(true);
+      setError(null);
+
       try {
-        const data = await getAssets();
+        const data = await getScanAssets(
+          currentScanId,
+        );
 
         setAssets(data);
       } catch (requestError) {
@@ -36,7 +54,7 @@ function Inventory() {
     }
 
     loadAssets();
-  }, []);
+  }, [scanId]);
 
   const filteredAssets = useMemo(() => {
     const query = search

@@ -34,6 +34,13 @@ export interface SeverityCounts {
 
 export interface Overview {
   mode: string;
+  scan_id: string;
+  source: ScanSource;
+  environment: string;
+  status: ScanStatus;
+  created_at: string;
+  account_identifier: string | null;
+  regions: string[];
   assets: number;
   relationships: number;
   sensitive_assets: number;
@@ -158,6 +165,108 @@ export interface SimulationResult {
   before: SimulationStateSummary;
   after: SimulationStateSummary;
   impact: SimulationImpact;
+}
+
+
+export type ScanSource =
+  | "local_lab"
+  | "aws";
+
+
+export type ScanStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "partial"
+  | "failed";
+
+
+export interface ScanRecord {
+  scan_id: string;
+  source: ScanSource;
+  environment: string;
+  status: ScanStatus;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  account_identifier: string | null;
+  regions: string[];
+  asset_count: number;
+  relationship_count: number;
+  finding_count: number;
+  attack_path_count: number;
+  highest_risk: number;
+  failed_collectors: string[];
+  error_message: string | null;
+  scanner_version: string;
+  duration_ms: number | null;
+}
+
+
+export interface ScanCreateRequest {
+  source: ScanSource;
+  environment?: string;
+  regions?: string[];
+  wait?: boolean;
+}
+
+
+export type ChangeStatus =
+  | "new"
+  | "unchanged"
+  | "resolved";
+
+
+export interface FindingChange {
+  fingerprint: string;
+  status: ChangeStatus;
+  finding_id: string;
+  title: string;
+  severity: string;
+  risk_score: number;
+}
+
+
+export interface AttackPathChange {
+  path_id: string;
+  status: ChangeStatus;
+  source: string;
+  target: string;
+  nodes: string[];
+  risk_score: number;
+}
+
+
+export interface ComparisonResult {
+  scan_a: string;
+  scan_b: string;
+  risk_before: number;
+  risk_after: number;
+  risk_delta: number;
+  findings_before: number;
+  findings_after: number;
+  new_findings: FindingChange[];
+  unchanged_findings: FindingChange[];
+  resolved_findings: FindingChange[];
+  paths_before: number;
+  paths_after: number;
+  new_paths: AttackPathChange[];
+  unchanged_paths: AttackPathChange[];
+  resolved_paths: AttackPathChange[];
+  note: string;
+}
+
+
+export interface RemediationVerification {
+  remediation_id: string;
+  scan_a: string;
+  scan_b: string;
+  status: ChangeStatus;
+  resolved_finding_ids: string[];
+  remaining_finding_ids: string[];
+  resolved_path_ids: string[];
+  remaining_path_ids: string[];
+  note: string;
 }
 
 

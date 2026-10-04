@@ -5,8 +5,12 @@ import {
 } from "react";
 
 import {
-  getIdentityRisks,
+  getScanIdentityRisks,
 } from "../services/api";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   IdentityRisk,
@@ -14,6 +18,12 @@ import type {
 
 
 function Identity() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [identities, setIdentities] =
     useState<IdentityRisk[]>([]);
 
@@ -32,15 +42,28 @@ function Identity() {
 
 
   useEffect(() => {
+    if (!scanId) {
+      return;
+    }
+
+    const currentScanId: string = scanId;
+
     async function loadIdentityRisks() {
+      setLoading(true);
+      setError(null);
+
       try {
         const data =
-          await getIdentityRisks();
+          await getScanIdentityRisks(
+            currentScanId,
+          );
 
         setIdentities(data);
 
         if (data.length > 0) {
           setSelectedIdentity(data[0]);
+        } else {
+          setSelectedIdentity(null);
         }
       } catch (requestError) {
         setError(
@@ -57,7 +80,7 @@ function Identity() {
     }
 
     loadIdentityRisks();
-  }, []);
+  }, [scanId]);
 
 
   const metrics = useMemo(() => {

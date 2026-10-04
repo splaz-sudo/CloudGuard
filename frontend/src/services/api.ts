@@ -1,6 +1,7 @@
 import type {
   AttackPath,
   CloudAsset,
+  ComparisonResult,
   ComplianceReport,
   Finding,
   IdentityRisk,
@@ -8,6 +9,9 @@ import type {
   Overview,
   Relationship,
   Remediation,
+  RemediationVerification,
+  ScanCreateRequest,
+  ScanRecord,
   SecurityReport,
   SimulationResult,
 } from "../types/cloudguard";
@@ -51,6 +55,7 @@ async function request<T>(
   endpoint: string,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   method: "GET" | "POST" = "GET",
+  body?: unknown,
 ): Promise<T> {
   const controller = new AbortController();
 
@@ -69,7 +74,18 @@ async function request<T>(
           method,
           headers: {
             Accept: "application/json",
+            ...(body !== undefined
+              ? {
+                  "Content-Type":
+                    "application/json",
+                }
+              : {}),
           },
+          ...(body !== undefined
+            ? {
+                body: JSON.stringify(body),
+              }
+            : {}),
           signal: controller.signal,
         },
       );
@@ -280,5 +296,190 @@ export function simulateRemediation(
       + "/simulate",
     DEFAULT_TIMEOUT_MS,
     "POST",
+  );
+}
+
+
+// ------------------------------------------
+// Scan endpoints
+// ------------------------------------------
+
+
+export function createScan(
+  payload: ScanCreateRequest,
+): Promise<ScanRecord> {
+  return request<ScanRecord>(
+    "/api/scans",
+    120_000,
+    "POST",
+    payload,
+  );
+}
+
+
+export function listScans(): Promise<
+  ScanRecord[]
+> {
+  return request<ScanRecord[]>("/api/scans");
+}
+
+
+export function getScan(
+  scanId: string,
+): Promise<ScanRecord> {
+  return request<ScanRecord>(
+    `/api/scans/${encodeURIComponent(scanId)}`,
+  );
+}
+
+
+function scanUrl(
+  scanId: string,
+  suffix: string,
+): string {
+  return (
+    "/api/scans/"
+    + encodeURIComponent(scanId)
+    + suffix
+  );
+}
+
+
+export function getScanOverview(
+  scanId: string,
+): Promise<Overview> {
+  return request<Overview>(
+    scanUrl(scanId, "/overview"),
+  );
+}
+
+
+export function getScanAssets(
+  scanId: string,
+): Promise<CloudAsset[]> {
+  return request<CloudAsset[]>(
+    scanUrl(scanId, "/assets"),
+  );
+}
+
+
+export function getScanRelationships(
+  scanId: string,
+): Promise<Relationship[]> {
+  return request<Relationship[]>(
+    scanUrl(scanId, "/relationships"),
+  );
+}
+
+
+export function getScanFindings(
+  scanId: string,
+): Promise<Finding[]> {
+  return request<Finding[]>(
+    scanUrl(scanId, "/findings"),
+  );
+}
+
+
+export function getScanAttackPaths(
+  scanId: string,
+): Promise<AttackPath[]> {
+  return request<AttackPath[]>(
+    scanUrl(scanId, "/attack-paths"),
+  );
+}
+
+
+export function getScanRemediations(
+  scanId: string,
+): Promise<Remediation[]> {
+  return request<Remediation[]>(
+    scanUrl(scanId, "/remediations"),
+  );
+}
+
+
+export function getScanPrioritizedRemediations(
+  scanId: string,
+): Promise<Remediation[]> {
+  return request<Remediation[]>(
+    scanUrl(
+      scanId,
+      "/remediations/prioritized",
+    ),
+  );
+}
+
+
+export function simulateScanRemediation(
+  scanId: string,
+  remediationId: string,
+): Promise<SimulationResult> {
+  return request<SimulationResult>(
+    scanUrl(
+      scanId,
+      "/remediations/"
+        + encodeURIComponent(remediationId)
+        + "/simulate",
+    ),
+    DEFAULT_TIMEOUT_MS,
+    "POST",
+  );
+}
+
+
+export function getScanIdentityRisks(
+  scanId: string,
+): Promise<IdentityRisk[]> {
+  return request<IdentityRisk[]>(
+    scanUrl(scanId, "/identity-risks"),
+  );
+}
+
+
+export function getScanNetworkRisks(
+  scanId: string,
+): Promise<NetworkRisk[]> {
+  return request<NetworkRisk[]>(
+    scanUrl(scanId, "/network-risks"),
+  );
+}
+
+
+export function getScanCompliance(
+  scanId: string,
+): Promise<ComplianceReport> {
+  return request<ComplianceReport>(
+    scanUrl(scanId, "/compliance"),
+  );
+}
+
+
+export function compareScans(
+  scanA: string,
+  scanB: string,
+): Promise<ComparisonResult> {
+  return request<ComparisonResult>(
+    "/api/scans/compare/"
+      + encodeURIComponent(scanA)
+      + "/"
+      + encodeURIComponent(scanB),
+  );
+}
+
+
+export function verifyRemediation(
+  scanA: string,
+  remediationId: string,
+  scanB: string,
+): Promise<RemediationVerification> {
+  return request<RemediationVerification>(
+    scanUrl(
+      scanA,
+      "/remediations/"
+        + encodeURIComponent(remediationId)
+        + "/verify/"
+        + encodeURIComponent(scanB),
+    ),
   );
 }

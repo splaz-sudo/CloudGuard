@@ -5,8 +5,12 @@ import {
 } from "react";
 
 import {
-  getFindings,
+  getScanFindings,
 } from "../services/api";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   Finding,
@@ -23,6 +27,12 @@ type SeverityFilter =
 
 
 function Findings() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [findings, setFindings] =
     useState<Finding[]>([]);
 
@@ -45,9 +55,20 @@ function Findings() {
 
 
   useEffect(() => {
+    if (!scanId) {
+      return;
+    }
+
+    const currentScanId: string = scanId;
+
     async function loadFindings() {
+      setLoading(true);
+      setError(null);
+
       try {
-        const data = await getFindings();
+        const data = await getScanFindings(
+          currentScanId,
+        );
 
         const sorted = [...data].sort(
           (left, right) =>
@@ -61,6 +82,8 @@ function Findings() {
           setSelectedFinding(
             sorted[0],
           );
+        } else {
+          setSelectedFinding(null);
         }
       } catch (requestError) {
         setError(
@@ -74,7 +97,7 @@ function Findings() {
     }
 
     loadFindings();
-  }, []);
+  }, [scanId]);
 
 
   const metrics = useMemo(() => {

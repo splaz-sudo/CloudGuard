@@ -5,8 +5,12 @@ import {
 } from "react";
 
 import {
-  getCompliance,
+  getScanCompliance,
 } from "../services/api";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   ComplianceControl,
@@ -15,6 +19,12 @@ import type {
 
 
 function Compliance() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [report, setReport] =
     useState<ComplianceReport | null>(null);
 
@@ -38,10 +48,19 @@ function Compliance() {
 
 
   useEffect(() => {
+    if (!scanId) {
+      return;
+    }
+
+    const currentScanId: string = scanId;
+
     async function loadCompliance() {
+      setLoading(true);
+      setError(null);
+
       try {
         const data =
-          await getCompliance();
+          await getScanCompliance(currentScanId);
 
         setReport(data);
 
@@ -49,6 +68,8 @@ function Compliance() {
           setSelectedControl(
             data.controls[0],
           );
+        } else {
+          setSelectedControl(null);
         }
       } catch (requestError) {
         setError(
@@ -65,7 +86,7 @@ function Compliance() {
     }
 
     loadCompliance();
-  }, []);
+  }, [scanId]);
 
 
   const controls = useMemo(() => {

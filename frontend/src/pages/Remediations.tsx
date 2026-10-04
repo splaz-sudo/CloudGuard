@@ -6,9 +6,13 @@ import {
 
 import {
   CloudGuardAPIError,
-  getPrioritizedRemediations,
-  simulateRemediation,
+  getScanPrioritizedRemediations,
+  simulateScanRemediation,
 } from "../services/api";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   Remediation,
@@ -17,6 +21,12 @@ import type {
 
 
 function Remediations() {
+  const { selectedScan } =
+    useScanContext();
+
+  const scanId =
+    selectedScan?.scan_id ?? null;
+
   const [remediations, setRemediations] =
     useState<Remediation[]>([]);
 
@@ -40,14 +50,21 @@ function Remediations() {
 
   const loadRemediations =
     useCallback(async () => {
+      if (!scanId) {
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
       try {
         const data =
-          await getPrioritizedRemediations();
+          await getScanPrioritizedRemediations(
+            scanId,
+          );
 
         setRemediations(data);
+        setSimulations({});
       } catch (requestError) {
         if (
           requestError
@@ -64,7 +81,7 @@ function Remediations() {
       } finally {
         setLoading(false);
       }
-    }, []);
+    }, [scanId]);
 
 
   useEffect(() => {
@@ -75,6 +92,10 @@ function Remediations() {
   async function runSimulation(
     remediationId: string,
   ) {
+    if (!scanId) {
+      return;
+    }
+
     setSimulating((current) => ({
       ...current,
       [remediationId]: true,
@@ -87,7 +108,8 @@ function Remediations() {
 
     try {
       const result =
-        await simulateRemediation(
+        await simulateScanRemediation(
+          scanId,
           remediationId,
         );
 
