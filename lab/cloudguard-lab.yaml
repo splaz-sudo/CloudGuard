@@ -1,0 +1,298 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  CloudGuard controlled AWS security lab.
+  Creates an intentionally internet-exposed EC2 instance,
+  an IAM role with read access to a tagged S3 bucket,
+  and supporting networking resources for CloudGuard testing.
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.nano
+    Description: EC2 instance type used by the CloudGuard lab.
+
+Resources:
+
+  # ========================================================
+  # VPC
+  # ========================================================
+
+  CloudGuardVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.50.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-vpc
+        - Key: Project
+          Value: CloudGuard
+
+  # ========================================================
+  # INTERNET GATEWAY
+  # ========================================================
+
+  CloudGuardInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-igw
+        - Key: Project
+          Value: CloudGuard
+
+  CloudGuardInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref CloudGuardVPC
+      InternetGatewayId: !Ref CloudGuardInternetGateway
+
+  # ========================================================
+  # PUBLIC SUBNET
+  # ========================================================
+
+  CloudGuardPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CloudGuardVPC
+      CidrBlock: 10.50.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-public-subnet
+        - Key: Project
+          Value: CloudGuard
+
+  # ========================================================
+  # ROUTE TABLE
+  # ========================================================
+
+  CloudGuardRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CloudGuardVPC
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-route-table
+        - Key: Project
+          Value: CloudGuard
+
+  CloudGuardInternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn:
+      - CloudGuardInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref CloudGuardRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref CloudGuardInternetGateway
+
+  CloudGuardSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref CloudGuardPublicSubnet
+      RouteTableId: !Ref CloudGuardRouteTable
+
+  # ========================================================
+  # SECURITY GROUP
+  #
+  # Intentionally exposes TCP port 80 to the internet.
+  # CloudGuard should detect this relationship.
+  # ========================================================
+
+  CloudGuardSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: >
+        CloudGuard controlled lab security group with
+        intentional public HTTP exposure.
+      VpcId: !Ref CloudGuardVPC
+
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: Intentional CloudGuard lab exposure
+
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          Description: Allow outbound traffic
+
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-sg
+        - Key: Project
+          Value: CloudGuard
+
+  # ========================================================
+  # S3 BUCKET
+  #
+  # This bucket contains no real sensitive data.
+  # The tag is used to test CloudGuard classification.
+  # ========================================================
+
+  CloudGuardSensitiveBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-sensitive-bucket
+
+        - Key: Project
+          Value: CloudGuard
+
+        - Key: CloudGuardSensitive
+          Value: "true"
+
+        - Key: DataClassification
+          Value: confidential
+
+  # ========================================================
+  # IAM MANAGED POLICY
+  #
+  # Grants only the S3 permissions required for the
+  # controlled attack-path test.
+  # ========================================================
+
+  CloudGuardS3ReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: >
+        CloudGuard lab policy granting read access to
+        the controlled sensitive S3 bucket.
+
+      PolicyDocument:
+        Version: "2012-10-17"
+
+        Statement:
+          - Sid: ListSensitiveBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+              - !GetAtt CloudGuardSensitiveBucket.Arn
+
+          - Sid: ReadSensitiveBucketObjects
+            Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              - !Sub "${CloudGuardSensitiveBucket.Arn}/*"
+
+  # ========================================================
+  # IAM ROLE
+  # ========================================================
+
+  CloudGuardEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cloudguard-lab-ec2-role
+
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+
+        Statement:
+          - Sid: AllowEC2AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+      ManagedPolicyArns:
+        - !Ref CloudGuardS3ReadPolicy
+
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-ec2-role
+        - Key: Project
+          Value: CloudGuard
+
+  # ========================================================
+  # INSTANCE PROFILE
+  # ========================================================
+
+  CloudGuardInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: cloudguard-lab-instance-profile
+      Roles:
+        - !Ref CloudGuardEC2Role
+
+  # ========================================================
+  # EC2 INSTANCE
+  #
+  # Uses Amazon Linux 2023 from AWS's public SSM parameter.
+  # No SSH port or key pair is required.
+  # ========================================================
+
+  CloudGuardEC2Instance:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - CloudGuardInternetRoute
+
+    Properties:
+      InstanceType: !Ref InstanceType
+
+      ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+
+      SubnetId: !Ref CloudGuardPublicSubnet
+
+      SecurityGroupIds:
+        - !Ref CloudGuardSecurityGroup
+
+      IamInstanceProfile: !Ref CloudGuardInstanceProfile
+
+      Tags:
+        - Key: Name
+          Value: cloudguard-lab-web
+
+        - Key: Project
+          Value: CloudGuard
+
+        - Key: Purpose
+          Value: SecurityTesting
+
+Outputs:
+
+  InstanceId:
+    Description: CloudGuard lab EC2 instance ID
+    Value: !Ref CloudGuardEC2Instance
+
+  InstancePublicIP:
+    Description: Public IP assigned to the lab EC2 instance
+    Value: !GetAtt CloudGuardEC2Instance.PublicIp
+
+  SensitiveBucketName:
+    Description: Controlled sensitive S3 bucket
+    Value: !Ref CloudGuardSensitiveBucket
+
+  IAMRoleName:
+    Description: IAM role attached to the EC2 instance
+    Value: !Ref CloudGuardEC2Role
+
+  SecurityGroupId:
+    Description: Security group used by the EC2 instance
+    Value: !Ref CloudGuardSecurityGroup
+
+  VPCId:
+    Description: VPC used by the CloudGuard lab
+    Value: !Ref CloudGuardVPC
