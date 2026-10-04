@@ -48,6 +48,34 @@ class AnalysisService:
             instance_profiles,
         ) = lab.create_environment()
 
+        return self.analyze_environment(
+            instances=instances,
+            security_groups=security_groups,
+            buckets=buckets,
+            roles=roles,
+            instance_profiles=instance_profiles,
+            account_id=lab.ACCOUNT_ID,
+        )
+
+    def analyze_environment(
+        self,
+        *,
+        instances,
+        security_groups,
+        buckets,
+        roles,
+        instance_profiles,
+        account_id: str,
+    ) -> AnalysisResult:
+        """
+        Runs the analysis pipeline over an
+        already-collected environment.
+
+        Used by the local lab and by tests; the
+        same entry point can serve real AWS
+        collector output.
+        """
+
         normalizer = AWSNormalizer()
 
         assets: list[CloudAsset] = []
@@ -55,21 +83,21 @@ class AnalysisService:
         assets.extend(
             normalizer.normalize_ec2(
                 instances,
-                lab.ACCOUNT_ID,
+                account_id,
             )
         )
 
         assets.extend(
             normalizer.normalize_s3(
                 buckets,
-                lab.ACCOUNT_ID,
+                account_id,
             )
         )
 
         assets.extend(
             normalizer.normalize_roles(
                 roles,
-                lab.ACCOUNT_ID,
+                account_id,
             )
         )
 
