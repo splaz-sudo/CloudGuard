@@ -4,6 +4,13 @@ from cloudguard.api.presenters import (
     overview_payload,
     scan_http_error,
 )
+from cloudguard.comparison.engine import (
+    ComparisonEngine,
+)
+from cloudguard.comparison.models import (
+    ComparisonResult,
+    RemediationVerification,
+)
 from cloudguard.findings.models import Finding
 from cloudguard.graph.attack_paths import (
     AttackPath,
@@ -58,6 +65,8 @@ network_analysis_service = (
 compliance_analysis_service = (
     ComplianceAnalysisService()
 )
+
+comparison_engine = ComparisonEngine()
 
 
 @router.post("")
@@ -370,6 +379,85 @@ def get_scan_network_risks(
             risk.to_dict()
             for risk in risks
         ]
+    except Exception as error:
+        raise scan_http_error(
+            error
+        ) from error
+
+
+@router.get(
+    "/compare/{scan_a}/{scan_b}",
+)
+def compare_scans(
+    scan_a: str,
+    scan_b: str,
+) -> ComparisonResult:
+    """
+    Deterministic comparison of two completed
+    scans: findings and attack paths are
+    classified NEW / UNCHANGED / RESOLVED by
+    fingerprint and path identity.
+    """
+
+    try:
+        service = get_scan_service()
+
+        return comparison_engine.compare(
+            service.get_snapshot(scan_a),
+            service.get_snapshot(scan_b),
+        )
+    except Exception as error:
+        raise scan_http_error(
+            error
+        ) from error
+
+
+@router.get(
+    "/{scan_a}/remediations/"
+    "{remediation_id}/verify/{scan_b}",
+)
+def verify_remediation(
+    scan_a: str,
+    remediation_id: str,
+    scan_b: str,
+) -> RemediationVerification:
+    """
+    Observation-based verification: checks
+    whether the findings and attack paths a
+    remediation targeted are still observed
+    in the newer scan.
+    """
+
+    try:
+        service = get_scan_service()
+
+        snapshot_a = service.get_snapshot(
+            scan_a
+        )
+        snapshot_b = service.get_snapshot(
+            scan_b
+        )
+
+        for remediation in (
+            snapshot_a.remediations
+        ):
+            if (
+                remediation.remediation_id
+                == remediation_id
+            ):
+                return (
+                    comparison_engine
+                    .verify_remediation(
+                        snapshot_a,
+                        snapshot_b,
+                        remediation,
+                    )
+                )
+
+        raise ScanNotFoundError(
+            "Unknown remediation for scan "
+            f"{scan_a}: {remediation_id}"
+        )
     except Exception as error:
         raise scan_http_error(
             error

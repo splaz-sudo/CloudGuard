@@ -189,18 +189,31 @@ def test_unknown_scan_raises(service):
 def test_interrupted_scans_recovered(
     make_service,
 ):
-    first_service = make_service()
-
-    running = first_service.create_scan(
-        ScanSource.LOCAL_LAB,
-        wait=False,
+    from datetime import (
+        datetime,
+        timezone,
     )
 
-    # Simulate an interrupted process by
-    # forcing the record back to RUNNING.
-    running.status = ScanStatus.RUNNING
-    first_service.repository.update_scan(
-        running
+    from cloudguard.scans.models import (
+        ScanRecord,
+    )
+
+    first_service = make_service()
+
+    # Simulate a scan left RUNNING by a
+    # process that died mid-scan.
+    stuck = ScanRecord(
+        scan_id="scan-interrupted",
+        source=ScanSource.LOCAL_LAB,
+        environment="public-ec2",
+        status=ScanStatus.RUNNING,
+        created_at=datetime.now(
+            timezone.utc
+        ),
+    )
+
+    first_service.repository.insert_scan(
+        stuck
     )
 
     # A new service instance over the same
@@ -211,7 +224,7 @@ def test_interrupted_scans_recovered(
     )
 
     record = recovered.get_scan(
-        running.scan_id
+        stuck.scan_id
     )
 
     assert record.status == ScanStatus.FAILED
