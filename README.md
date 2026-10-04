@@ -54,6 +54,10 @@ CloudGuard analyzes:
 - Contextual findings
 - Compliance mappings
 - Security reports
+- Explainable attack paths
+- Structured remediation recommendations
+- Remediation prioritization by simulated impact
+- Read-only remediation simulation
 
 The analysis results are exposed through a FastAPI REST API and an interactive React/TypeScript dashboard.
 
@@ -278,6 +282,81 @@ Sensitive S3 Bucket
 ```
 
 The distinction is important: CloudGuard can represent both an individual exposure and the broader security path created when that exposure is combined with identity and resource relationships.
+
+---
+
+# 🧭 Explainable Attack Paths
+
+Every discovered attack path carries a structured explanation of **why** each hop exists:
+
+```text
+Internet
+   │
+   │ Security-group configuration allows public
+   │ inbound traffic from the internet.
+   │ (evidence: security group sg-cloudguard-web, tcp:80-80)
+   ▼
+EC2
+   │
+   │ Attached to IAM role through an instance profile.
+   ▼
+IAM Role
+   │
+   │ IAM policy grants s3:GetObject, s3:ListBucket.
+   ▼
+Sensitive S3 Bucket
+```
+
+Each hop exposes:
+
+- relationship type
+- human-readable reason
+- evidence recorded at detection time
+- the configuration responsible for the relationship
+- the security impact of that step
+
+Explanations are derived only from configuration CloudGuard actually detected. CloudGuard does not claim exploitability beyond the relationships it can show.
+
+---
+
+# 🛠️ Remediation & Simulate Fix
+
+CloudGuard converts supported findings into **structured remediation recommendations**:
+
+- remediation ID, title, description
+- affected resources, findings, attack paths, and relationships
+- evidence and manual steps
+- expected effect
+
+Current supported conditions:
+
+| Condition | Recommendation |
+|---|---|
+| Public internet exposure (`exposed_to`) | Restrict the offending security-group ingress |
+| IAM write access to a sensitive resource (`can_write`) | Reduce the granted permissions to least privilege |
+
+## Remediation Prioritization
+
+Remediations are ranked by **simulated impact**, not severity labels:
+
+1. attack paths eliminated (descending)
+2. absolute risk-score reduction (descending)
+3. remediation ID (deterministic tie-break)
+
+The risk score is CloudGuard's **prioritization score**. It is not a statistical probability.
+
+## Simulate Fix
+
+`POST /api/remediations/{remediation_id}/simulate` evaluates a remediation against an **isolated in-memory copy** of the security graph:
+
+```text
+CURRENT STATE → DEEP COPY → VIRTUAL REMEDIATION
+  → RECALCULATE PATHS/FINDINGS/RISK → BEFORE/AFTER DIFF
+```
+
+The response reports before/after highest risk, attack-path counts, removed paths, and absolute/percentage risk reduction. The `after` values are always recalculated from the simulated state — remaining findings keep their scores.
+
+> **Simulation disclaimer:** CloudGuard simulation is predictive analysis based on CloudGuard's security model. It does **not** guarantee that a remediation eliminates every real-world attack vector. It does **not** modify AWS resources, and simulated changes are never persisted.
 
 ---
 
@@ -640,7 +719,7 @@ python -m pytest -q
 Current verified result:
 
 ```text
-68 passed
+97 passed
 ```
 
 The automated suite covers:
@@ -673,6 +752,9 @@ The automated suite covers:
 | `/api/identity-risks` | IAM and identity risk |
 | `/api/network-risks` | Network exposure analysis |
 | `/api/compliance` | Compliance mappings |
+| `/api/remediations` | Structured remediation candidates |
+| `/api/remediations/prioritized` | Remediations ranked by simulated impact |
+| `/api/remediations/{id}/simulate` | Read-only remediation simulation |
 | `/api/report` | JSON security assessment |
 | `/api/report/pdf` | PDF security assessment |
 
@@ -802,6 +884,10 @@ Implemented capabilities include:
 - FastAPI REST API
 - React/TypeScript dashboard
 - Interactive attack-path visualization
+- Explainable attack paths (per-hop reason, evidence, configuration, impact)
+- Structured remediation recommendations
+- Remediation prioritization by simulated impact
+- Read-only remediation simulation with before/after risk analysis
 - JSON security reports
 - PDF security reports
 - Structured logging
@@ -811,6 +897,6 @@ Implemented capabilities include:
 - Frontend API resilience
 - Automated security and API tests
 
-**Current verified automated test result: `68 passed`**
+**Current verified automated test result: `97 passed`**
 
 Further development will focus on expanding cloud-service coverage, analysis depth, and production-oriented capabilities.
