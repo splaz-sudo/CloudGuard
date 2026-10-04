@@ -87,7 +87,10 @@ class AttackPathEngine:
                     hop_count=len(node_path) - 1,
                     sensitive_target=sensitive_target,
                     relationships=relationships,
-                    path_id=_path_id(node_path),
+                    path_id=_path_id(
+                        node_path,
+                        relationships,
+                    ),
                     severity=(
                         severity_from_score(
                             ATTACK_PATH_TO_SENSITIVE_SCORE
@@ -187,16 +190,35 @@ class AttackPathEngine:
         return hops
 
 
-def _path_id(node_path: list[str]) -> str:
+def _path_id(
+    node_path: list[str],
+    relationships: list[Relationship],
+) -> str:
     """
-    Stable, content-derived path identifier.
+    Stable, content-derived path identity.
 
-    Deterministic for a given node sequence so
-    findings, remediations, and scan comparisons
-    can reference the same path.
+    Built from the ordered node identities and
+    the ordered relationship types, so two
+    semantically identical attack paths across
+    scans receive the same identifier.
+    Timestamps and enumeration order are never
+    part of the identity.
     """
+
+    parts: list[str] = []
+
+    for index, node_id in enumerate(node_path):
+        parts.append(node_id)
+
+        if index < len(relationships):
+            parts.append(
+                relationships[index]
+                .relationship_type
+                .value
+            )
+
     digest = hashlib.sha1(
-        ">".join(node_path).encode("utf-8")
+        ">".join(parts).encode("utf-8")
     ).hexdigest()
 
     return f"PATH-{digest[:12]}"

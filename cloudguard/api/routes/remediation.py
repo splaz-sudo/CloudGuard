@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
+from cloudguard.api.presenters import (
+    scan_http_error,
+)
 from cloudguard.remediation.models import (
     Remediation,
     SimulationResult,
@@ -8,8 +11,8 @@ from cloudguard.remediation.service import (
     RemediationNotFoundError,
     RemediationService,
 )
-from cloudguard.services.analysis import (
-    AnalysisService,
+from cloudguard.scans.runtime import (
+    get_scan_service,
 )
 
 
@@ -18,30 +21,48 @@ router = APIRouter(
     tags=["Remediation"],
 )
 
-analysis_service = AnalysisService()
-
 remediation_service = RemediationService()
+
+
+def _latest_analysis():
+    """
+    Backwards-compatible source: the newest
+    completed local-lab scan.
+    """
+
+    service = get_scan_service()
+
+    snapshot = (
+        service
+        .get_or_create_latest_local_lab()
+    )
+
+    return (
+        snapshot,
+        service.analysis_result_for(
+            snapshot
+        ),
+    )
 
 
 @router.get("")
 def get_remediations() -> list[Remediation]:
     """
     Returns structured remediation candidates
-    generated from the current analysis.
+    from the latest completed scan.
 
     Recommendations are advisory only.
     CloudGuard does not modify cloud resources.
     """
 
-    result = (
-        analysis_service
-        .analyze_local_lab()
-    )
+    try:
+        snapshot, _ = _latest_analysis()
 
-    return (
-        remediation_service
-        .get_remediations(result)
-    )
+        return snapshot.remediations
+    except Exception as error:
+        raise scan_http_error(
+            error
+        ) from error
 
 
 @router.get("/prioritized")
@@ -52,22 +73,19 @@ def get_prioritized_remediations() -> (
     Returns remediations ranked by simulated
     impact: attack paths eliminated, then
     risk-score reduction.
-
-    Each candidate is evaluated against an
-    isolated simulation of the current
-    environment. No cloud resources are
-    modified.
     """
 
-    result = (
-        analysis_service
-        .analyze_local_lab()
-    )
+    try:
+        _, result = _latest_analysis()
 
-    return (
-        remediation_service
-        .get_prioritized(result)
-    )
+        return (
+            remediation_service
+            .get_prioritized(result)
+        )
+    except Exception as error:
+        raise scan_http_error(
+            error
+        ) from error
 
 
 @router.post("/{remediation_id}/simulate")
@@ -75,20 +93,15 @@ def simulate_remediation(
     remediation_id: str,
 ) -> SimulationResult:
     """
-    Simulates a remediation against an isolated
-    copy of the current security state and
-    returns before/after risk analysis.
-
-    This endpoint never modifies cloud
-    resources.
+    Simulates a remediation against an
+    isolated copy of the latest scan's
+    security state. Never modifies cloud
+    resources or stored scans.
     """
 
-    result = (
-        analysis_service
-        .analyze_local_lab()
-    )
-
     try:
+        _, result = _latest_analysis()
+
         return remediation_service.simulate(
             result,
             remediation_id,
@@ -101,3 +114,7 @@ def simulate_remediation(
                 f"{remediation_id}"
             ),
         ) from None
+    except Exception as error:
+        raise scan_http_error(
+            error
+        ) from error

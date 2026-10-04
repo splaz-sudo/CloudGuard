@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+from cloudguard.collectors import (
+    CollectedEnvironment,
+)
 from cloudguard.findings.classifier import ResourceClassifier
 from cloudguard.findings.engine import FindingEngine
 from cloudguard.findings.models import Finding
@@ -25,6 +28,10 @@ class AnalysisResult:
     security_graph: SecurityGraph
     attack_paths: list[AttackPath]
     findings: list[Finding]
+
+    environment: (
+        CollectedEnvironment | None
+    ) = None
 
 
 class AnalysisService:
@@ -66,6 +73,7 @@ class AnalysisService:
         roles,
         instance_profiles,
         account_id: str,
+        users=None,
     ) -> AnalysisResult:
         """
         Runs the analysis pipeline over an
@@ -100,6 +108,14 @@ class AnalysisService:
                 account_id,
             )
         )
+
+        if users:
+            assets.extend(
+                normalizer.normalize_users(
+                    users,
+                    account_id,
+                )
+            )
 
         classifier = ResourceClassifier()
 
@@ -137,4 +153,17 @@ class AnalysisService:
             security_graph=security_graph,
             attack_paths=attack_paths,
             findings=findings,
+            environment=CollectedEnvironment(
+                instances=list(instances),
+                security_groups=list(
+                    security_groups
+                ),
+                buckets=list(buckets),
+                roles=list(roles),
+                users=list(users or []),
+                instance_profiles=list(
+                    instance_profiles
+                ),
+                account_id=account_id,
+            ),
         )

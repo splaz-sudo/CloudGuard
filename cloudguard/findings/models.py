@@ -43,3 +43,7 @@ class Finding(BaseModel):
         ge=0,
         le=100,
     )
+
+    # Deterministic identity for cross-scan
+    # comparison. See findings/fingerprints.py.
+    fingerprint: str = ""

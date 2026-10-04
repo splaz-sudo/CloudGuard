@@ -14,6 +14,9 @@ from cloudguard.api.routes.health import (
 from cloudguard.api.routes.remediation import (
     router as remediation_router,
 )
+from cloudguard.api.routes.scans import (
+    router as scans_router,
+)
 from cloudguard.api.routes.security import (
     router as security_router,
 )
@@ -74,6 +77,10 @@ app.include_router(
 
 app.include_router(
     remediation_router
+)
+
+app.include_router(
+    scans_router
 )
 
 

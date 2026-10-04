@@ -1,3 +1,26 @@
+import os
+import tempfile
+
+# Point the scan database at a throwaway
+# file before any CloudGuard app module is
+# imported.
+_TEST_DB = os.path.join(
+    tempfile.mkdtemp(
+        prefix="cloudguard-tests-"
+    ),
+    "test-scans.db",
+)
+
+os.environ.setdefault(
+    "CLOUDGUARD_DATABASE_PATH",
+    _TEST_DB,
+)
+
+os.environ.setdefault(
+    "CLOUDGUARD_ENV",
+    "test",
+)
+
 import pytest
 
 from cloudguard.collectors.ec2 import (

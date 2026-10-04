@@ -1,5 +1,9 @@
 import networkx as nx
 
+from cloudguard.findings.fingerprints import (
+    attack_path_fingerprint,
+    network_exposure_fingerprint,
+)
 from cloudguard.findings.models import (
     Finding,
     FindingCategory,
@@ -107,6 +111,11 @@ class FindingEngine:
                     ),
                     risk_score=(
                         INTERNET_EXPOSED_WORKLOAD_SCORE
+                    ),
+                    fingerprint=(
+                        network_exposure_fingerprint(
+                            target_id
+                        )
                     ),
                 )
             )
@@ -229,6 +238,11 @@ class FindingEngine:
                         ),
                         risk_score=(
                             ATTACK_PATH_TO_SENSITIVE_SCORE
+                        ),
+                        fingerprint=(
+                            attack_path_fingerprint(
+                                list(path)
+                            )
                         ),
                     )
                 )
