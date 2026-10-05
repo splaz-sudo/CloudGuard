@@ -14,6 +14,15 @@ class AssetType(str, Enum):
     SECRET = "secret"
     SECURITY_GROUP = "security_group"
     VPC = "vpc"
+    SUBNET = "subnet"
+    ROUTE_TABLE = "route_table"
+    INTERNET_GATEWAY = "internet_gateway"
+    NAT_GATEWAY = "nat_gateway"
+    NETWORK_ACL = "network_acl"
+    NETWORK_INTERFACE = "network_interface"
+    ELASTIC_IP = "elastic_ip"
+    LOAD_BALANCER = "load_balancer"
+    TARGET_GROUP = "target_group"
 
 
 class CloudAsset(BaseModel):
