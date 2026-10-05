@@ -96,6 +96,7 @@ export interface AttackPathHop {
   configuration: string | null;
   impact: string | null;
   permissions: string[];
+  confidence?: "HIGH" | "MEDIUM" | "LOW";
 }
 
 
@@ -111,6 +112,7 @@ export interface AttackPath {
   risk_score: number;
   hops: AttackPathHop[];
   explanation: string;
+  confidence?: "HIGH" | "MEDIUM" | "LOW";
 }
 
 
