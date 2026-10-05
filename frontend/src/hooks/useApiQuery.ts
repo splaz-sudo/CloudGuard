@@ -40,6 +40,7 @@ export function useApiQuery<T>(
   const [error, setError] = useState<CloudGuardAPIError | null>(null);
 
   const attemptRef = useRef(0);
+  const requestRef = useRef(0);
   const mountedRef = useRef(true);
   const fetcherRef = useRef(fetcher);
 
@@ -51,22 +52,28 @@ export function useApiQuery<T>(
   const executeFetch = useCallback(async (isRetry = false) => {
     if (!mountedRef.current) return;
 
+    const requestId = ++requestRef.current;
+
     if (!isRetry) {
+      // Start every new request from a clean slate: clearing both error and
+      // data guarantees the UI can never render a stale payload beneath a
+      // newer request's error (or vice versa).
       setLoading(true);
       setError(null);
+      setData(null);
     }
 
     try {
       const result = await fetcherRef.current();
-      if (mountedRef.current) {
-        setData(result);
-        setLoading(false);
-        if (isRetry) {
-          attemptRef.current = 0;
-        }
+      if (!mountedRef.current || requestRef.current !== requestId) return;
+      setData(result);
+      setLoading(false);
+      setError(null);
+      if (isRetry) {
+        attemptRef.current = 0;
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || requestRef.current !== requestId) return;
 
       if (err instanceof CloudGuardAPIError) {
         setError(err);
@@ -78,20 +85,20 @@ export function useApiQuery<T>(
           (err.status === 429 || err.status === 503 || err.status === 0 || err.status === 504)
         ) {
           attemptRef.current += 1;
+          const scheduledFor = attemptRef.current;
           setTimeout(() => {
-            if (mountedRef.current) {
+            // Only run the retry if no newer request has started since.
+            if (mountedRef.current && requestRef.current === requestId) {
               executeFetch(true);
             }
-          }, retryDelay * attemptRef.current);
+          }, retryDelay * scheduledFor);
           return;
         }
       } else {
         setError(new CloudGuardAPIError("Unknown error occurred"));
       }
 
-      if (mountedRef.current) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [retryCount, retryDelay]);
 

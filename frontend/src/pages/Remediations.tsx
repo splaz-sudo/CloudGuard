@@ -1,8 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
+
+import { useLocation } from "react-router-dom";
 
 import {
   CloudGuardAPIError,
@@ -26,6 +24,14 @@ function Remediations() {
 
   const scanId =
     selectedScan?.scan_id ?? null;
+
+  const location = useLocation();
+
+  const requestedRemediationId = (
+    location.state as { remediationId?: string } | null
+  )?.remediationId;
+
+  const autoSimulatedRef = useRef<string | null>(null);
 
   const [remediations, setRemediations] =
     useState<Remediation[]>([]);
@@ -87,6 +93,31 @@ function Remediations() {
   useEffect(() => {
     void loadRemediations();
   }, [loadRemediations]);
+
+  // A fix handed over from the Overview page runs its simulation once the
+  // matching remediation for the current scan has loaded.
+  useEffect(() => {
+    if (!requestedRemediationId || loading) {
+      return;
+    }
+
+    if (autoSimulatedRef.current === requestedRemediationId) {
+      return;
+    }
+
+    const isKnown = remediations.some(
+      (entry) =>
+        entry.remediation_id === requestedRemediationId,
+    );
+
+    if (!isKnown) {
+      return;
+    }
+
+    autoSimulatedRef.current = requestedRemediationId;
+    void runSimulation(requestedRemediationId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedRemediationId, loading, remediations]);
 
 
   async function runSimulation(

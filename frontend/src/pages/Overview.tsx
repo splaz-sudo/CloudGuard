@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 import {
   compareScans,
   getScanAttackPaths,
@@ -22,6 +24,8 @@ import type {
 function Overview() {
   const { scans, selectedScan } =
     useScanContext();
+
+  const navigate = useNavigate();
 
   const scanId =
     selectedScan?.scan_id ?? null;
@@ -505,7 +509,14 @@ function Overview() {
                   type="button"
                   className="simulate-button"
                   onClick={() => {
-                    // TODO: Connect to simulation
+                    // Hand the selected fix to the Remediations page,
+                    // which runs the read-only simulation for this scan.
+                    navigate("/remediations", {
+                      state: {
+                        remediationId:
+                          remediation.remediation_id,
+                      },
+                    });
                   }}
                 >
                   SIMULATE FIX

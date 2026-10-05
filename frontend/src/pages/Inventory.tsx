@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useScanContext } from "../context/ScanContext";
 import { getScanAssets } from "../services/api";
+import { MultiSelect, SearchInput, Select } from "../components/FormControls";
 import type { CloudAsset } from "../types/cloudguard";
 
 
@@ -235,89 +236,62 @@ function Inventory() {
             <label htmlFor="inventory-search">
               Search
             </label>
-            <input
+            <SearchInput
               id="inventory-search"
               className="inventory-search"
-              type="search"
-              placeholder="Search assets by name, ID, or type..."
+              placeholder="Search assets..."
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
+              onChange={setSearch}
             />
           </div>
 
-          <div className="filter-group">
-            <label>Type</label>
-            <select
-              className="filter-multi"
-              multiple
-              value={typeFilter}
-              onChange={(e) =>
-                setTypeFilter(
-                  Array.from(e.target.selectedOptions, (o) => o.value),
-                )
-              }
-            >
-              {availableTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelect
+            label="Type"
+            options={availableTypes.map((type) => ({
+              value: type,
+              label: type,
+            }))}
+            value={typeFilter}
+            onChange={setTypeFilter}
+            placeholder="All types"
+          />
 
-          <div className="filter-group">
-            <label>Region</label>
-            <select
-              className="filter-multi"
-              multiple
-              value={regionFilter}
-              onChange={(e) =>
-                setRegionFilter(
-                  Array.from(e.target.selectedOptions, (o) => o.value),
-                )
-              }
-            >
-              {availableRegions.map((region) => (
-                <option key={region} value={region}>
-                  {region}
-                </option>
-              ))}
-            </select>
-          </div>
+          <MultiSelect
+            label="Region"
+            options={availableRegions.map((region) => ({
+              value: region,
+              label: region,
+            }))}
+            value={regionFilter}
+            onChange={setRegionFilter}
+            placeholder="All regions"
+          />
 
-          <div className="filter-group">
-            <label>Exposure</label>
-            <select
-              value={exposureFilter}
-              onChange={(e) =>
-                setExposureFilter(
-                  e.target.value as "all" | "exposed" | "internal",
-                )
-              }
-            >
-              <option value="all">All</option>
-              <option value="exposed">Internet Exposed</option>
-              <option value="internal">Internal Only</option>
-            </select>
-          </div>
+          <Select
+            label="Exposure"
+            options={[
+              { value: "all", label: "All" },
+              { value: "exposed", label: "Internet Exposed" },
+              { value: "internal", label: "Internal Only" },
+            ]}
+            value={exposureFilter}
+            onChange={(value) =>
+              setExposureFilter(value as "all" | "exposed" | "internal")
+            }
+          />
 
-          <div className="filter-group">
-            <label>Classification</label>
-            <select
-              value={sensitivityFilter}
-              onChange={(e) =>
-                setSensitivityFilter(
-                  e.target.value as "all" | "sensitive" | "standard",
-                )
-              }
-            >
-              <option value="all">All</option>
-              <option value="sensitive">Sensitive</option>
-              <option value="standard">Standard</option>
-            </select>
-          </div>
+          <Select
+            label="Classification"
+            options={[
+              { value: "all", label: "All" },
+              { value: "sensitive", label: "Sensitive" },
+              { value: "standard", label: "Standard" },
+            ]}
+            value={sensitivityFilter}
+            onChange={(value) =>
+              setSensitivityFilter(value as "all" | "sensitive" | "standard")
+            }
+          />
         </div>
 
         <div className="inventory-table-wrapper">

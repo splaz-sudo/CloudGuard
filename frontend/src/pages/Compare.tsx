@@ -128,8 +128,12 @@ function Compare() {
         </section>
       )}
 
+      {/* Error and results are mutually exclusive: the query hook clears
+          stale data whenever a new request starts, so a failure can never
+          render alongside a payload that belongs to a different request. */}
       {canCompare
-        && comparison.error && (
+        && comparison.error
+        && !comparison.data && (
         <section className="page-state error-message">
           <div>
             <h2>Comparison failed</h2>
@@ -151,6 +155,8 @@ function Compare() {
       )}
 
       {canCompare
+        && !comparison.loading
+        && !comparison.error
         && comparison.data && (
         <ComparisonView
           comparison={

@@ -12,6 +12,8 @@ import {
   useScanContext,
 } from "../context/ScanContext";
 
+import { MultiSelect, SearchInput, Select } from "../components/FormControls";
+
 import type {
   Finding,
 } from "../types/cloudguard";
@@ -257,9 +259,6 @@ function Findings() {
         </div>
       </header>
 
-
-// Comparison banner removed - comparison feature not active
-
       <section className="findings-metrics">
         <FindingMetric
           label="Critical"
@@ -287,96 +286,53 @@ function Findings() {
 
 
       <section className="findings-toolbar">
-        <input
-          type="search"
-          className="findings-search"
-          placeholder="Search findings by title, ID, category, evidence..."
-          value={search}
-          onChange={(event) =>
-            setSearch(
-              event.target.value,
-            )
-          }
-        />
-
-        <div className="findings-filters">
-          <div className="filter-group">
-            <label>Severity</label>
-            <select
-              value={severityFilter}
-              onChange={(e) =>
-                setSeverityFilter(
-                  e.target.value as SeverityFilter,
-                )
-              }
-            >
-              <option value="all">All</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-              <option value="info">Info</option>
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Category</label>
-            <select
-              className="filter-multi"
-              multiple
-              value={categoryFilter}
-              onChange={(e) =>
-                setCategoryFilter(
-                  Array.from(
-                    e.target.selectedOptions,
-                    (o) => o.value,
-                  ),
-                )
-              }
-            >
-              {availableCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>Region</label>
-            <select
-              className="filter-multi"
-              multiple
-              value={regionFilter}
-              onChange={(e) =>
-                setRegionFilter(
-                  Array.from(
-                    e.target.selectedOptions,
-                    (o) => o.value,
-                  ),
-                )
-              }
-            >
-              {availableRegions.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        <div className="filter-group search-group">
+          <label htmlFor="findings-search">
+            Search
+          </label>
+          <SearchInput
+            id="findings-search"
+            className="findings-search"
+            placeholder="Search findings by title, ID, category..."
+            value={search}
+            onChange={setSearch}
+          />
         </div>
 
-        <input
-          type="search"
-          className="findings-search"
-          placeholder="Search findings..."
-          value={search}
-          onChange={(event) =>
-            setSearch(
-              event.target.value,
-            )
-          }
+        <Select
+          label="Severity"
+          options={[
+            { value: "all", label: "All severities" },
+            { value: "critical", label: "Critical" },
+            { value: "high", label: "High" },
+            { value: "medium", label: "Medium" },
+            { value: "low", label: "Low" },
+            { value: "info", label: "Info" },
+          ]}
+          value={severityFilter}
+          onChange={(value) => setSeverityFilter(value as SeverityFilter)}
+        />
+
+        <MultiSelect
+          label="Category"
+          options={availableCategories.map((cat) => ({
+            value: cat,
+            label: cat,
+          }))}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          placeholder="All categories"
+        />
+
+        <MultiSelect
+          label="Region"
+          options={availableRegions.map((r) => ({
+            value: r,
+            label: r,
+          }))}
+          value={regionFilter}
+          onChange={setRegionFilter}
+          placeholder="All regions"
         />
       </section>
 
@@ -759,8 +715,6 @@ function FindingDetails({
             </strong>
           </div>
         )}
-
-// Comparison scan reference removed - comparison feature not active
       </div>
     </div>
     </div>
