@@ -60,6 +60,18 @@ class ScanRecord(BaseModel):
     regions: list[str] = Field(
         default_factory=list
     )
+    regions_completed: list[str] = Field(
+        default_factory=list
+    )
+    regions_partial: list[str] = Field(
+        default_factory=list
+    )
+    regions_failed: list[str] = Field(
+        default_factory=list
+    )
+    regions_attempted: list[str] = Field(
+        default_factory=list
+    )
 
     asset_count: int = 0
     relationship_count: int = 0

@@ -240,6 +240,9 @@ class ScanService:
                 regions,
                 failed_collectors,
                 collector_results,
+                regions_completed,
+                regions_partial,
+                regions_failed,
             ) = self._collect_and_analyze(
                 record
             )
@@ -263,6 +266,9 @@ class ScanService:
                 account_identifier
             )
             record.regions = regions
+            record.regions_completed = regions_completed
+            record.regions_partial = regions_partial
+            record.regions_failed = regions_failed
             record.failed_collectors = (
                 failed_collectors
             )
@@ -473,6 +479,9 @@ class ScanService:
             [environment.region],
             [],
             collector_results,
+            [environment.region],  # regions_completed
+            [],                    # regions_partial
+            [],                    # regions_failed
         )
 
     def _analyze_aws(
@@ -582,6 +591,10 @@ class ScanService:
         instance_profiles = []
         collector_results: list[CollectorResult] = []
 
+        regions_completed = []
+        regions_partial = []
+        regions_failed = []
+
         def cancelled() -> bool:
             return bool(
                 cancel_event
@@ -593,6 +606,11 @@ class ScanService:
                 raise RuntimeError(
                     "Scan cancelled by user."
                 )
+
+            record.regions_attempted.append(region)
+
+            region_ec2_success = False
+            region_ec2_failed = False
 
             try:
                 session = AWSSession(
@@ -616,6 +634,7 @@ class ScanService:
                         )
                         else []
                     )
+                    region_ec2_success = True
 
                 ec2_sg_result = ec2.collect_security_groups()
                 collector_results.append(ec2_sg_result)
@@ -628,6 +647,7 @@ class ScanService:
                         )
                         else []
                     )
+                    region_ec2_success = True
 
             except (
                 ClientError,
@@ -668,43 +688,52 @@ class ScanService:
                         ),
                     )
                 )
+                region_ec2_failed = True
 
-        try:
-            s3 = S3Collector(
-                identity_session,
-                retry_config=retry_config,
-            )
-            s3_result = s3.collect_buckets()
-            collector_results.append(s3_result)
+            # Track region status based on EC2 results
+            if region_ec2_success and not region_ec2_failed:
+                regions_completed.append(region)
+            elif region_ec2_success and region_ec2_failed:
+                regions_partial.append(region)
+            else:
+                regions_failed.append(region)
 
-            if s3_result.status == "success":
-                buckets.extend(
-                    s3_result.data
-                    if hasattr(
-                        s3_result, "data"
+            try:
+                s3 = S3Collector(
+                    identity_session,
+                    retry_config=retry_config,
+                )
+                s3_result = s3.collect_buckets()
+                collector_results.append(s3_result)
+
+                if s3_result.status == "success":
+                    buckets.extend(
+                        s3_result.data
+                        if hasattr(
+                            s3_result, "data"
+                        )
+                        else []
                     )
-                    else []
+
+            except (
+                ClientError,
+                BotoCoreError,
+            ) as error:
+                logger.warning(
+                    "S3 collection failed",
+                    extra={
+                        "event": (
+                            "collector_failed"
+                        ),
+                        "scan_id": record.scan_id,
+                        "collector": "s3",
+                        "error_type": type(
+                            error
+                        ).__name__,
+                    },
                 )
 
-        except (
-            ClientError,
-            BotoCoreError,
-        ) as error:
-            logger.warning(
-                "S3 collection failed",
-                extra={
-                    "event": (
-                        "collector_failed"
-                    ),
-                    "scan_id": record.scan_id,
-                    "collector": "s3",
-                    "error_type": type(
-                        error
-                    ).__name__,
-                },
-            )
-
-            collector_results.append(
+                collector_results.append(
                 CollectorResult(
                     collector="s3",
                     service="s3",
@@ -830,6 +859,10 @@ class ScanService:
             for r in collector_results
             if r.status == "failed"
         ]
+
+        record.regions_completed = regions_completed
+        record.regions_partial = regions_partial
+        record.regions_failed = regions_failed
 
         return (
             result,
