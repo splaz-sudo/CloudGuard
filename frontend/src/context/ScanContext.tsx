@@ -16,6 +16,7 @@ import {
 
 import type {
   ScanRecord,
+  ScanSource,
 } from "../types/cloudguard";
 
 
@@ -29,6 +30,12 @@ type ScanContextValue = {
   startLocalLabScan: (
     environment?: string,
   ) => Promise<ScanRecord | null>;
+  // Helper functions for UI display
+  getSourceLabel: (source: ScanSource) => string;
+  getStatusLabel: (status: string) => { label: string; variant: "success" | "warning" | "error" | "info" };
+  getDataFreshness: (scan: ScanRecord) => string;
+  isSimulation: (scan: ScanRecord | null) => boolean;
+  isHistorical: (scan: ScanRecord | null, allScans: ScanRecord[]) => boolean;
 };
 
 
@@ -167,6 +174,54 @@ export function ScanProvider({
   );
 
 
+  // Helper functions for clear UI labeling
+  const getSourceLabel = (source: ScanSource): string => {
+    switch (source) {
+      case "local_lab":
+        return "LOCAL LAB";
+      case "aws":
+        return "AWS SCAN";
+      default:
+        return "UNKNOWN";
+    }
+  };
+
+  const getStatusLabel = (status: string): { label: string; variant: "success" | "warning" | "error" | "info" } => {
+    switch (status) {
+      case "completed":
+        return { label: "COMPLETED", variant: "success" };
+      case "partial":
+        return { label: "PARTIAL", variant: "warning" };
+      case "failed":
+        return { label: "FAILED", variant: "error" };
+      case "running":
+        return { label: "RUNNING", variant: "info" };
+      case "pending":
+        return { label: "PENDING", variant: "info" };
+      default:
+        return { label: status.toUpperCase(), variant: "info" };
+    }
+  };
+
+  const getDataFreshness = (scan: ScanRecord): string => {
+    if (scan.source === "local_lab") {
+      return "SIMULATED DATA";
+    }
+    return "SCAN RESULT";
+  };
+
+  const isSimulation = (scan: ScanRecord | null): boolean => {
+    return scan?.source === "local_lab";
+  };
+
+  const isHistorical = (scan: ScanRecord | null, allScans: ScanRecord[]): boolean => {
+    if (!scan) return false;
+    const sorted = [...allScans].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    return sorted[0]?.scan_id !== scan.scan_id;
+  };
+
   const value = useMemo(
     () => ({
       scans,
@@ -176,6 +231,12 @@ export function ScanProvider({
       refreshScans,
       selectScan,
       startLocalLabScan,
+      // Helper functions for UI
+      getSourceLabel,
+      getStatusLabel,
+      getDataFreshness,
+      isSimulation,
+      isHistorical,
     }),
     [
       scans,
@@ -187,7 +248,6 @@ export function ScanProvider({
       startLocalLabScan,
     ],
   );
-
 
   return (
     <ScanContext.Provider value={value}>
