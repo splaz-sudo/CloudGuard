@@ -1,8 +1,11 @@
+import time
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from cloudguard.aws_errors import CollectorResult
 from cloudguard.collectors.aws_session import AWSSession
+from cloudguard.retry import RetryConfig, retry_with_backoff
 
 
 class IAMPolicyStatement(BaseModel):
@@ -48,8 +51,10 @@ class IAMCollector:
     def __init__(
         self,
         aws_session: AWSSession,
+        retry_config: RetryConfig | None = None,
     ) -> None:
         self.client = aws_session.client("iam")
+        self.retry_config = retry_config or RetryConfig.standard()
 
     @staticmethod
     def _as_list(
@@ -185,32 +190,72 @@ class IAMCollector:
 
     def collect_roles(
         self,
-    ) -> list[IAMRole]:
-        roles: list[IAMRole] = []
+    ) -> CollectorResult:
 
-        paginator = self.client.get_paginator(
-            "list_roles"
-        )
+        def _collect() -> list[IAMRole]:
+            roles: list[IAMRole] = []
 
-        for page in paginator.paginate():
-            for role in page.get(
-                "Roles",
-                [],
-            ):
-                roles.append(
-                    IAMRole(
-                        name=role["RoleName"],
-                        arn=role["Arn"],
-                        role_id=role["RoleId"],
-                        attached_policies=(
-                            self._attached_role_policies(
-                                role["RoleName"]
-                            )
-                        ),
+            paginator = self.client.get_paginator(
+                "list_roles"
+            )
+
+            for page in paginator.paginate():
+                for role in page.get(
+                    "Roles",
+                    [],
+                ):
+                    roles.append(
+                        IAMRole(
+                            name=role["RoleName"],
+                            arn=role["Arn"],
+                            role_id=role["RoleId"],
+                            attached_policies=(
+                                self._attached_role_policies(
+                                    role["RoleName"]
+                                )
+                            ),
+                        )
                     )
-                )
 
-        return roles
+            return roles
+
+        started = time.perf_counter()
+
+        try:
+            roles = retry_with_backoff(_collect, self.retry_config)
+            return CollectorResult(
+                collector="iam",
+                service="iam",
+                region=None,
+                status="success",
+                resources_discovered=len(roles),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+                data=roles,
+            )
+        except Exception as error:
+            from cloudguard.aws_errors import (
+                classify_collector_error,
+                safe_error_message,
+            )
+            return CollectorResult(
+                collector="iam",
+                service="iam",
+                region=None,
+                status="failed",
+                error_category=classify_collector_error(
+                    error
+                ),
+                error_message=safe_error_message(error),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+            )
 
     def collect_users(
         self,
@@ -241,34 +286,143 @@ class IAMCollector:
 
         return users
 
+    def collect_users(
+        self,
+    ) -> CollectorResult:
+
+        def _collect() -> list[IAMUser]:
+            users: list[IAMUser] = []
+
+            paginator = self.client.get_paginator(
+                "list_users"
+            )
+
+            for page in paginator.paginate():
+                for user in page.get(
+                    "Users",
+                    [],
+                ):
+                    users.append(
+                        IAMUser(
+                            name=user["UserName"],
+                            arn=user["Arn"],
+                            user_id=user["UserId"],
+                            attached_policies=(
+                                self._attached_user_policies(
+                                    user["UserName"]
+                                )
+                            ),
+                        )
+                    )
+
+            return users
+
+        started = time.perf_counter()
+
+        try:
+            users = retry_with_backoff(_collect, self.retry_config)
+            return CollectorResult(
+                collector="iam",
+                service="iam",
+                region=None,
+                status="success",
+                resources_discovered=len(users),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+                data=users,
+            )
+        except Exception as error:
+            from cloudguard.aws_errors import (
+                classify_collector_error,
+                safe_error_message,
+            )
+            return CollectorResult(
+                collector="iam",
+                service="iam",
+                region=None,
+                status="failed",
+                error_category=classify_collector_error(
+                    error
+                ),
+                error_message=safe_error_message(error),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+            )
+
     def collect_instance_profiles(
         self,
-    ) -> list[InstanceProfile]:
-        profiles: list[InstanceProfile] = []
+    ) -> CollectorResult:
 
-        paginator = self.client.get_paginator(
-            "list_instance_profiles"
-        )
+        def _collect() -> list[InstanceProfile]:
+            profiles: list[InstanceProfile] = []
 
-        for page in paginator.paginate():
-            for profile in page.get(
-                "InstanceProfiles",
-                [],
-            ):
-                profiles.append(
-                    InstanceProfile(
-                        name=profile[
-                            "InstanceProfileName"
-                        ],
-                        arn=profile["Arn"],
-                        role_names=[
-                            role["RoleName"]
-                            for role in profile.get(
-                                "Roles",
-                                [],
-                            )
-                        ],
+            paginator = self.client.get_paginator(
+                "list_instance_profiles"
+            )
+
+            for page in paginator.paginate():
+                for profile in page.get(
+                    "InstanceProfiles",
+                    [],
+                ):
+                    profiles.append(
+                        InstanceProfile(
+                            name=profile[
+                                "InstanceProfileName"
+                            ],
+                            arn=profile["Arn"],
+                            role_names=[
+                                role["RoleName"]
+                                for role in profile.get(
+                                    "Roles",
+                                    [],
+                                )
+                            ],
+                        )
                     )
-                )
 
-        return profiles
+            return profiles
+
+        started = time.perf_counter()
+
+        try:
+            profiles = retry_with_backoff(_collect, self.retry_config)
+            return CollectorResult(
+                collector="iam",
+                service="iam",
+                region=None,
+                status="success",
+                resources_discovered=len(profiles),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+                data=profiles,
+            )
+        except Exception as error:
+            from cloudguard.aws_errors import (
+                classify_collector_error,
+                safe_error_message,
+            )
+            return CollectorResult(
+                collector="iam",
+                service="iam",
+                region=None,
+                status="failed",
+                error_category=classify_collector_error(
+                    error
+                ),
+                error_message=safe_error_message(error),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+            )

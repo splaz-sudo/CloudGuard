@@ -263,3 +263,40 @@ def test_legacy_endpoints_use_latest_scan():
     assert len(findings) == overview[
         "findings"
     ]
+
+
+def test_collector_results_endpoint():
+    created = create_scan()
+
+    scan_id = created["scan_id"]
+
+    response = client.get(
+        f"/api/scans/{scan_id}/collector-results"
+    )
+
+    assert response.status_code == 200
+
+    results = response.json()
+
+    assert len(results) == 5
+
+    collector_names = {
+        result["collector"]
+        for result in results
+    }
+
+    expected_collectors = {
+        "local_lab_ec2_instances",
+        "local_lab_ec2_security_groups",
+        "local_lab_s3_buckets",
+        "local_lab_iam_roles",
+        "local_lab_iam_instance_profiles",
+    }
+
+    assert collector_names == expected_collectors
+
+    for result in results:
+        assert result["status"] == "success"
+        assert result["resources_discovered"] >= 1
+        assert result["error_category"] is None
+        assert result["error_message"] is None

@@ -17,7 +17,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA_STATEMENTS = (
     """
@@ -125,6 +125,25 @@ SCHEMA_STATEMENTS = (
         data_json TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS scan_collector_results (
+        scan_id TEXT NOT NULL REFERENCES scans(scan_id),
+        collector TEXT NOT NULL,
+        service TEXT NOT NULL,
+        region TEXT,
+        status TEXT NOT NULL,
+        resources_discovered INTEGER NOT NULL DEFAULT 0,
+        duration_ms REAL NOT NULL DEFAULT 0.0,
+        error_category TEXT,
+        error_message TEXT,
+        coverage_limitation TEXT,
+        PRIMARY KEY (scan_id, collector, service, region)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_collector_results_scan_id
+    ON scan_collector_results(scan_id)
+    """,
 )
 
 
@@ -168,6 +187,18 @@ class Database:
 
                 self._connection.execute(
                     "PRAGMA user_version = 1"
+                )
+
+            if version < 2:
+                for statement in (
+                    SCHEMA_STATEMENTS[14:17]
+                ):
+                    self._connection.execute(
+                        statement
+                    )
+
+                self._connection.execute(
+                    "PRAGMA user_version = 2"
                 )
 
             self._connection.commit()

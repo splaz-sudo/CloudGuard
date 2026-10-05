@@ -4,6 +4,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from cloudguard.aws_errors import CollectorResult
 from cloudguard.collectors import (
     CollectedEnvironment,
 )
@@ -125,6 +126,9 @@ class ScanSnapshot:
     environment: (
         CollectedEnvironment | None
     ) = None
+    collector_results: list[CollectorResult] = (
+        dc_field(default_factory=list)
+    )
 
     def build_graph(self) -> SecurityGraph:
         graph = SecurityGraph()

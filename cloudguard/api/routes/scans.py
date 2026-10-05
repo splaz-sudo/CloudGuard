@@ -11,6 +11,7 @@ from cloudguard.comparison.models import (
     ComparisonResult,
     RemediationVerification,
 )
+from cloudguard.aws_errors import CollectorResult
 from cloudguard.findings.models import Finding
 from cloudguard.graph.attack_paths import (
     AttackPath,
@@ -491,3 +492,27 @@ def get_scan_compliance(
         raise scan_http_error(
             error
         ) from error
+
+
+@router.get("/{scan_id}/collector-results")
+def get_scan_collector_results(
+    scan_id: str,
+) -> list[CollectorResult]:
+    """
+    Returns detailed collector execution results
+    for a scan, including success/failure status,
+    resources discovered, duration, and any
+    error categories for failed collectors.
+    """
+
+    try:
+        snapshot = (
+            get_scan_service()
+            .get_snapshot(scan_id)
+        )
+    except Exception as error:
+        raise scan_http_error(
+            error
+        ) from error
+
+    return snapshot.collector_results

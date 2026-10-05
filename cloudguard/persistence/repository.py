@@ -36,6 +36,7 @@ from cloudguard.models.relationships import (
 from cloudguard.persistence.database import (
     Database,
 )
+from cloudguard.aws_errors import CollectorResult
 from cloudguard.remediation.models import (
     Remediation,
 )
@@ -365,6 +366,90 @@ class ScanRepository:
                 ),
             )
 
+        self._save_collector_results(
+            record.scan_id,
+            snapshot.collector_results or [],
+        )
+
+    def _save_collector_results(
+        self,
+        scan_id: str,
+        results: list[CollectorResult],
+    ) -> None:
+        import json
+
+        self.database.executemany(
+            """
+            INSERT OR REPLACE INTO scan_collector_results (
+                scan_id, collector, service, region,
+                status, resources_discovered,
+                duration_ms, error_category,
+                error_message, coverage_limitation
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    scan_id,
+                    result.collector,
+                    result.service,
+                    result.region,
+                    result.status,
+                    result.resources_discovered,
+                    result.duration_ms,
+                    result.error_category.value
+                    if result.error_category
+                    else None,
+                    result.error_message,
+                    result.coverage_limitation,
+                )
+                for result in results
+            ],
+        )
+
+    def get_collector_results(
+        self,
+        scan_id: str,
+    ) -> list[CollectorResult]:
+        from cloudguard.aws_errors import (
+            CollectorResult,
+            CollectorErrorCategory,
+        )
+
+        rows = self.database.execute(
+            "SELECT * FROM scan_collector_results "
+            "WHERE scan_id = ?",
+            (scan_id,),
+        ).fetchall()
+
+        results: list[CollectorResult] = []
+
+        for row in rows:
+            error_category = None
+            if row["error_category"]:
+                error_category = CollectorErrorCategory(
+                    row["error_category"]
+                )
+
+            results.append(
+                CollectorResult(
+                    collector=row["collector"],
+                    service=row["service"],
+                    region=row["region"],
+                    status=row["status"],
+                    resources_discovered=row[
+                        "resources_discovered"
+                    ],
+                    duration_ms=row["duration_ms"],
+                    error_category=error_category,
+                    error_message=row["error_message"],
+                    coverage_limitation=row[
+                        "coverage_limitation"
+                    ],
+                )
+            )
+
+        return results
+
     @staticmethod
     def _environment_to_dict(
         environment: CollectedEnvironment,
@@ -564,6 +649,8 @@ class ScanRepository:
                     )
                 )
             )
+
+        snapshot.collector_results = self.get_collector_results(scan_id)
 
         return snapshot
 

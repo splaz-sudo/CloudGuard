@@ -239,6 +239,7 @@ class ScanService:
                 account_identifier,
                 regions,
                 failed_collectors,
+                collector_results,
             ) = self._collect_and_analyze(
                 record
             )
@@ -295,6 +296,7 @@ class ScanService:
                 record,
                 analysis_result,
                 remediations,
+                collector_results=collector_results,
             )
 
             self.repository.save_snapshot(
@@ -379,6 +381,7 @@ class ScanService:
         self,
         record: ScanRecord,
     ):
+        from cloudguard.aws_errors import CollectorResult
         from cloudguard.lab_scenarios import (
             create_scenario_environment,
         )
@@ -415,11 +418,61 @@ class ScanService:
                 environment.region
             ]
 
+        # Generate mock collector results for LOCAL_LAB
+        collector_results = [
+            CollectorResult(
+                collector="local_lab_ec2_instances",
+                service="ec2",
+                region=environment.region,
+                status="success",
+                resources_discovered=len(environment.instances),
+                duration_ms=0.0,
+                data=environment.instances,
+            ),
+            CollectorResult(
+                collector="local_lab_ec2_security_groups",
+                service="ec2",
+                region=environment.region,
+                status="success",
+                resources_discovered=len(environment.security_groups),
+                duration_ms=0.0,
+                data=environment.security_groups,
+            ),
+            CollectorResult(
+                collector="local_lab_s3_buckets",
+                service="s3",
+                region=environment.region,
+                status="success",
+                resources_discovered=len(environment.buckets),
+                duration_ms=0.0,
+                data=environment.buckets,
+            ),
+            CollectorResult(
+                collector="local_lab_iam_roles",
+                service="iam",
+                region=environment.region,
+                status="success",
+                resources_discovered=len(environment.roles),
+                duration_ms=0.0,
+                data=environment.roles,
+            ),
+            CollectorResult(
+                collector="local_lab_iam_instance_profiles",
+                service="iam",
+                region=environment.region,
+                status="success",
+                resources_discovered=len(environment.instance_profiles),
+                duration_ms=0.0,
+                data=environment.instance_profiles,
+            ),
+        ]
+
         return (
             result,
             environment.account_id,
             [environment.region],
             [],
+            collector_results,
         )
 
     def _analyze_aws(
@@ -443,6 +496,11 @@ class ScanService:
             NoCredentialsError,
         )
 
+        from cloudguard.aws_errors import (
+            CollectorResult,
+            classify_collector_error,
+            safe_error_message,
+        )
         from cloudguard.collectors.aws_session import (  # noqa: E501
             AWSSession,
         )
@@ -458,6 +516,7 @@ class ScanService:
         from cloudguard.collectors.sts import (
             STSCollector,
         )
+        from cloudguard.retry import RetryConfig
 
         profile = (
             self.settings.aws_profile or None
@@ -477,6 +536,8 @@ class ScanService:
             )
         )
 
+        retry_config = RetryConfig.standard()
+
         try:
             identity_session = AWSSession(
                 profile_name=profile,
@@ -487,9 +548,11 @@ class ScanService:
                 ),
             )
 
-            identity = STSCollector(
-                identity_session
-            ).get_identity()
+            sts_collector = STSCollector(
+                identity_session,
+                retry_config=retry_config,
+            )
+            sts_result = sts_collector.get_identity()
 
         except NoCredentialsError:
             raise RuntimeError(
@@ -517,7 +580,7 @@ class ScanService:
         roles = []
         users = []
         instance_profiles = []
-        failed_collectors: list[str] = []
+        collector_results: list[CollectorResult] = []
 
         def cancelled() -> bool:
             return bool(
@@ -537,14 +600,34 @@ class ScanService:
                     region_name=region,
                 )
 
-                ec2 = EC2Collector(session)
+                ec2 = EC2Collector(
+                    session,
+                    retry_config=retry_config,
+                )
 
-                instances.extend(
-                    ec2.collect_instances()
-                )
-                security_groups.extend(
-                    ec2.collect_security_groups()
-                )
+                ec2_instances_result = ec2.collect_instances()
+                collector_results.append(ec2_instances_result)
+
+                if ec2_instances_result.status == "success":
+                    instances.extend(
+                        ec2_instances_result.data
+                        if hasattr(
+                            ec2_instances_result, "data"
+                        )
+                        else []
+                    )
+
+                ec2_sg_result = ec2.collect_security_groups()
+                collector_results.append(ec2_sg_result)
+
+                if ec2_sg_result.status == "success":
+                    security_groups.extend(
+                        ec2_sg_result.data
+                        if hasattr(
+                            ec2_sg_result, "data"
+                        )
+                        else []
+                    )
 
             except (
                 ClientError,
@@ -567,13 +650,41 @@ class ScanService:
                     },
                 )
 
-                failed_collectors.append(
-                    f"ec2:{region}"
+                collector_results.append(
+                    CollectorResult(
+                        collector="ec2",
+                        service="ec2",
+                        region=region,
+                        status="failed",
+                        error_category=(
+                            classify_collector_error(
+                                error
+                            )
+                        ),
+                        error_message=(
+                            safe_error_message(
+                                error
+                            )
+                        ),
+                    )
                 )
 
         try:
-            s3 = S3Collector(identity_session)
-            buckets = s3.collect_buckets()
+            s3 = S3Collector(
+                identity_session,
+                retry_config=retry_config,
+            )
+            s3_result = s3.collect_buckets()
+            collector_results.append(s3_result)
+
+            if s3_result.status == "success":
+                buckets.extend(
+                    s3_result.data
+                    if hasattr(
+                        s3_result, "data"
+                    )
+                    else []
+                )
 
         except (
             ClientError,
@@ -593,17 +704,67 @@ class ScanService:
                 },
             )
 
-            failed_collectors.append("s3")
+            collector_results.append(
+                CollectorResult(
+                    collector="s3",
+                    service="s3",
+                    region=None,
+                    status="failed",
+                    error_category=(
+                        classify_collector_error(
+                            error
+                        )
+                    ),
+                    error_message=safe_error_message(
+                        error
+                    ),
+                )
+            )
 
         try:
             iam = IAMCollector(
-                identity_session
+                identity_session,
+                retry_config=retry_config,
             )
-            roles = iam.collect_roles()
-            users = iam.collect_users()
-            instance_profiles = (
+            iam_roles_result = iam.collect_roles()
+            collector_results.append(iam_roles_result)
+
+            if iam_roles_result.status == "success":
+                roles.extend(
+                    iam_roles_result.data
+                    if hasattr(
+                        iam_roles_result, "data"
+                    )
+                    else []
+                )
+
+            iam_users_result = iam.collect_users()
+            collector_results.append(iam_users_result)
+
+            if iam_users_result.status == "success":
+                users.extend(
+                    iam_users_result.data
+                    if hasattr(
+                        iam_users_result, "data"
+                    )
+                    else []
+                )
+
+            iam_profiles_result = (
                 iam.collect_instance_profiles()
             )
+            collector_results.append(
+                iam_profiles_result
+            )
+
+            if iam_profiles_result.status == "success":
+                instance_profiles.extend(
+                    iam_profiles_result.data
+                    if hasattr(
+                        iam_profiles_result, "data"
+                    )
+                    else []
+                )
 
         except (
             ClientError,
@@ -623,7 +784,22 @@ class ScanService:
                 },
             )
 
-            failed_collectors.append("iam")
+            collector_results.append(
+                CollectorResult(
+                    collector="iam",
+                    service="iam",
+                    region=None,
+                    status="failed",
+                    error_category=(
+                        classify_collector_error(
+                            error
+                        )
+                    ),
+                    error_message=safe_error_message(
+                        error
+                    ),
+                )
+            )
 
         result = (
             self.analysis_service
@@ -649,11 +825,18 @@ class ScanService:
                 regions
             )
 
+        failed_collectors = [
+            f"{r.collector}:{r.region or r.service}"
+            for r in collector_results
+            if r.status == "failed"
+        ]
+
         return (
             result,
             identity.account_id,
             regions,
             failed_collectors,
+            collector_results,
         )
 
     # ------------------------------------------
@@ -800,6 +983,7 @@ class ScanService:
         record: ScanRecord,
         result: AnalysisResult,
         remediations,
+        collector_results: list | None = None,
     ) -> ScanSnapshot:
         relationships = []
 
@@ -838,6 +1022,7 @@ class ScanService:
             ),
             remediations=list(remediations),
             environment=result.environment,
+            collector_results=collector_results or [],
         )
 
     @staticmethod

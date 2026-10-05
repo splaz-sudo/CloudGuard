@@ -1,7 +1,11 @@
+import time
+
 from pydantic import BaseModel, Field
 from botocore.exceptions import ClientError
 
+from cloudguard.aws_errors import CollectorResult
 from cloudguard.collectors.aws_session import AWSSession
+from cloudguard.retry import RetryConfig, retry_with_backoff
 
 
 class S3Bucket(BaseModel):
@@ -18,55 +22,97 @@ class S3Collector:
     def __init__(
         self,
         aws_session: AWSSession,
+        retry_config: RetryConfig | None = None,
     ) -> None:
         self.client = aws_session.client("s3")
+        self.retry_config = retry_config or RetryConfig.standard()
 
     def collect_buckets(
         self,
-    ) -> list[S3Bucket]:
-        buckets: list[S3Bucket] = []
+    ) -> CollectorResult:
 
-        response = self.client.list_buckets()
+        def _collect() -> list[S3Bucket]:
+            buckets: list[S3Bucket] = []
 
-        for item in response.get(
-            "Buckets",
-            [],
-        ):
-            bucket_name = item["Name"]
+            response = self.client.list_buckets()
 
-            region = self._get_bucket_region(
-                bucket_name
-            )
+            for item in response.get(
+                "Buckets",
+                [],
+            ):
+                bucket_name = item["Name"]
 
-            public_access_block = (
-                self._has_public_access_block(
+                region = self._get_bucket_region(
                     bucket_name
                 )
-            )
 
-            policy_public = (
-                self._is_policy_public(
+                public_access_block = (
+                    self._has_public_access_block(
+                        bucket_name
+                    )
+                )
+
+                policy_public = (
+                    self._is_policy_public(
+                        bucket_name
+                    )
+                )
+
+                tags = self._get_bucket_tags(
                     bucket_name
                 )
-            )
 
-            tags = self._get_bucket_tags(
-                bucket_name
-            )
-
-            buckets.append(
-                S3Bucket(
-                    name=bucket_name,
-                    region=region,
-                    public_access_block_enabled=(
-                        public_access_block
-                    ),
-                    policy_public=policy_public,
-                    tags=tags,
+                buckets.append(
+                    S3Bucket(
+                        name=bucket_name,
+                        region=region,
+                        public_access_block_enabled=(
+                            public_access_block
+                        ),
+                        policy_public=policy_public,
+                        tags=tags,
+                    )
                 )
-            )
 
-        return buckets
+            return buckets
+
+        started = time.perf_counter()
+
+        try:
+            buckets = retry_with_backoff(_collect, self.retry_config)
+            return CollectorResult(
+                collector="s3",
+                service="s3",
+                region=None,
+                status="success",
+                resources_discovered=len(buckets),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+                data=buckets,
+            )
+        except Exception as error:
+            from cloudguard.aws_errors import (
+                classify_collector_error,
+                safe_error_message,
+            )
+            return CollectorResult(
+                collector="s3",
+                service="s3",
+                region=None,
+                status="failed",
+                error_category=classify_collector_error(
+                    error
+                ),
+                error_message=safe_error_message(error),
+                duration_ms=round(
+                    (time.perf_counter() - started)
+                    * 1000,
+                    2,
+                ),
+            )
 
     def _get_bucket_region(
         self,
