@@ -148,7 +148,14 @@ SCHEMA_STATEMENTS = (
 
 
 class Database:
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self,
+        path: str,
+        *,
+        wal_mode: bool = True,
+        busy_timeout_ms: int = 5000,
+        cache_size_kib: int = 8192,
+    ) -> None:
         self._lock = threading.Lock()
         self._connection = sqlite3.connect(
             path,
@@ -160,6 +167,21 @@ class Database:
         self._connection.execute(
             "PRAGMA foreign_keys = ON"
         )
+
+        # Performance and reliability pragmas
+        if wal_mode:
+            self._connection.execute(
+                "PRAGMA journal_mode = WAL"
+            )
+        if busy_timeout_ms:
+            self._connection.execute(
+                f"PRAGMA busy_timeout = {busy_timeout_ms}"
+            )
+        if cache_size_kib:
+            self._connection.execute(
+                f"PRAGMA cache_size = -{cache_size_kib}"
+            )
+
         self._migrate()
 
     def _migrate(self) -> None:
@@ -231,3 +253,43 @@ class Database:
     def close(self) -> None:
         with self._lock:
             self._connection.close()
+
+    def integrity_check(self) -> bool:
+        """
+        Run SQLite integrity check.
+        Returns True if database is consistent.
+        """
+        with self._lock:
+            result = self._connection.execute(
+                "PRAGMA integrity_check"
+            ).fetchone()
+            return result[0] == "ok"
+
+    def set_read_only(self, read_only: bool) -> None:
+        """
+        Set database to read-only mode.
+        Useful for replicas or read-only access.
+        """
+        with self._lock:
+            mode = "ON" if read_only else "OFF"
+            self._connection.execute(
+                f"PRAGMA read_only = {mode}"
+            )
+
+    def vacuum(self) -> None:
+        """
+        Rebuild database to reclaim space and defragment.
+        """
+        with self._lock:
+            self._connection.execute("VACUUM")
+
+    def backup_to(self, target_path: str) -> None:
+        """
+        Backup database to another file.
+        Uses SQLite's online backup API.
+        """
+        import sqlite3
+        target = sqlite3.connect(target_path)
+        with self._lock:
+            self._connection.backup(target)
+        target.close()
