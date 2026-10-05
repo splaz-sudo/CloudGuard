@@ -3,6 +3,7 @@ import {
   getScanAttackPaths,
   getScanFindings,
   getScanOverview,
+  getScanPrioritizedRemediations,
 } from "../services/api";
 
 import {
@@ -37,16 +38,19 @@ function Overview() {
         overview,
         findings,
         attackPaths,
+        remediations,
       ] = await Promise.all([
         getScanOverview(scanId),
         getScanFindings(scanId),
         getScanAttackPaths(scanId),
+        getScanPrioritizedRemediations(scanId),
       ]);
 
       return {
         overview,
         findings,
         attackPaths,
+        remediations,
       };
     },
     [scanId],
@@ -134,6 +138,7 @@ function Overview() {
     overview,
     findings,
     attackPaths,
+    remediations,
   } = dashboard.data;
 
 
@@ -393,6 +398,123 @@ function Overview() {
           )}
         </div>
       </section>
+
+      {remediations && remediations.length > 0 && (
+        <section className="panel remediation-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">
+                WHAT SHOULD I FIX FIRST?
+              </p>
+
+              <h3>Recommended Remediations</h3>
+            </div>
+
+            <span className="finding-count">
+              {remediations.length} remediation{remediations.length > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="remediation-list">
+            {remediations.map((remediation) => (
+              <article
+                className="remediation-card"
+                key={remediation.remediation_id}
+              >
+                <div className="remediation-header">
+                  <span className="remediation-rank">
+                    #{remediation.priority ?? '—'}
+                  </span>
+
+                  <div className="remediation-heading">
+                    <h3>{remediation.title}</h3>
+
+                    <span className="remediation-action">
+                      {remediation.action_type
+                        .replace(/_/g, ' ')
+                        .toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="details-text">
+                  {remediation.description}
+                </p>
+
+                <div className="finding-assets">
+                  {remediation.affected_resources.map(
+                    (resource) => (
+                      <span key={resource}>
+                        {resource}
+                      </span>
+                    ),
+                  )}
+                </div>
+
+                <div className="remediation-metrics">
+                  <div className="remediation-metric">
+                    <span>Attack paths affected</span>
+                    <strong>{remediation.paths_affected}</strong>
+                  </div>
+
+                  <div className="remediation-metric">
+                    <span>Paths removed</span>
+                    <strong>{remediation.paths_removed ?? '—'}</strong>
+                  </div>
+
+                  <div className="remediation-metric">
+                    <span>Risk before</span>
+                    <strong>{remediation.risk_before ?? '—'}</strong>
+                  </div>
+
+                  <div className="remediation-metric">
+                    <span>Risk after</span>
+                    <strong>{remediation.risk_after ?? '—'}</strong>
+                  </div>
+
+                  <div className="remediation-metric">
+                    <span>Risk reduction</span>
+                    <strong>
+                      {remediation.risk_reduction ?? '—'}
+                      ({remediation.risk_reduction_percent ?? 0}%)
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="details-divider" />
+
+                <p className="details-section-title">
+                  Evidence
+                </p>
+
+                <ul className="remediation-evidence">
+                  {remediation.evidence.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+
+                <p className="details-section-title">
+                  Expected effect
+                </p>
+
+                <p className="details-text">
+                  {remediation.expected_effect}
+                </p>
+
+                <button
+                  type="button"
+                  className="simulate-button"
+                  onClick={() => {
+                    // TODO: Connect to simulation
+                  }}
+                >
+                  SIMULATE FIX
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </>
   );
 }
