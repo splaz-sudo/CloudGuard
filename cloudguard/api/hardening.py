@@ -311,3 +311,197 @@ def sanitize_error_response(error: Exception) -> dict:
             "message": sanitized,
         }
     }
+def sanitize_path(path: str, allowed_base: str = "/") -> str:
+    """
+    Sanitize and validate file path to prevent path traversal.
+
+    Args:
+        path: Path to sanitize
+        allowed_base: Base directory that paths must be under
+
+    Returns:
+        Sanitized absolute path
+
+    Raises:
+        ValueError: If path attempts traversal or is outside allowed base
+    """
+    import os
+    from pathlib import Path
+
+    # Resolve to absolute path
+    try:
+        resolved = Path(path).resolve()
+        base = Path(allowed_base).resolve()
+    except Exception:
+        raise ValueError("Invalid path")
+
+    # Check if path is within allowed base
+    try:
+        resolved.relative_to(base)
+    except ValueError:
+        raise ValueError("Path traversal attempt detected")
+
+    return str(resolved)
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize filename to prevent path traversal and injection.
+
+    Removes:
+    - Path separators
+    - Null bytes
+    - Control characters
+    - Trailing spaces/dots (Windows reserved)
+
+    Args:
+        filename: Original filename
+
+    Returns:
+        Sanitized filename safe for storage
+    """
+    import os
+
+    if not filename:
+        return "unnamed"
+
+    # Remove path separators
+    filename = filename.replace("/", "").replace("\\", "")
+
+    # Remove null bytes and control characters
+    filename = "".join(c for c in filename if ord(c) >= 32)
+
+    # Remove Windows reserved names
+    reserved = {"CON", "PRN", "AUX", "NUL",
+                "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
+    name_part = filename.split(".")[0].upper()
+    if name_part in reserved:
+        filename = f"_{filename}"
+
+    # Limit length
+    if len(filename) > 255:
+        name, ext = os.path.splitext(filename)
+        filename = name[:255 - len(ext)] + ext
+
+    return filename
+
+
+def validate_json_schema(data: dict, schema: dict) -> tuple[bool, list[str]]:
+    """
+    Basic JSON schema validation.
+
+    Args:
+        data: Data to validate
+        schema: Expected schema (simplified)
+
+    Returns:
+        Tuple of (is_valid, list_of_errors)
+    """
+    errors = []
+
+    def check_type(value, expected_type, path=""):
+        if expected_type == "string" and not isinstance(value, str):
+            errors.append(f"{path}: expected string, got {type(value).__name__}")
+        elif expected_type == "number" and not isinstance(value, (int, float)):
+            errors.append(f"{path}: expected number, got {type(value).__name__}")
+        elif expected_type == "boolean" and not isinstance(value, bool):
+            errors.append(f"{path}: expected boolean, got {type(value).__name__}")
+        elif expected_type == "object" and not isinstance(value, dict):
+            errors.append(f"{path}: expected object, got {type(value).__name__}")
+        elif expected_type == "array" and not isinstance(value, list):
+            errors.append(f"{path}: expected array, got {type(value).__name__}")
+
+    def validate_object(obj, schema_def, path=""):
+        if not isinstance(obj, dict):
+            errors.append(f"{path}: expected object")
+            return
+
+        for key, expected in schema_def.items():
+            full_path = f"{path}.{key}" if path else key
+            if key not in obj:
+                if expected.get("required", False):
+                    errors.append(f"{full_path}: required field missing")
+                continue
+            if "type" in expected:
+                check_type(obj[key], expected["type"], full_path)
+            if expected.get("type") == "object" and "properties" in expected:
+                validate_object(obj[key], expected["properties"], full_path)
+
+    if "type" in schema:
+        check_type(data, schema["type"])
+    if schema.get("type") == "object" and "properties" in schema:
+        validate_object(data, schema["properties"])
+
+    return len(errors) == 0, errors
+
+
+def safe_subprocess_run(
+    cmd: list[str],
+    timeout: float = 30.0,
+    cwd: str = None,
+    env: dict = None,
+) -> tuple[int, str, str]:
+    """
+    Safely run a subprocess with timeout and no shell injection.
+
+    Args:
+        cmd: Command and arguments as list (never use shell=True)
+        timeout: Maximum execution time in seconds
+        cwd: Working directory
+        env: Environment variables
+
+    Returns:
+        Tuple of (return_code, stdout, stderr)
+
+    Raises:
+        subprocess.TimeoutExpired: If process exceeds timeout
+        ValueError: If cmd is not a list or contains shell metacharacters
+    """
+    import subprocess
+
+    if not isinstance(cmd, list):
+        raise ValueError("Command must be a list of arguments")
+
+    # Check for shell metacharacters in arguments
+    dangerous = {"|", "&", ";", "$", "`", ">", "<", "(", ")", "{", "}", "$(", "${"}
+    for arg in cmd:
+        if any(c in arg for c in dangerous):
+            raise ValueError(f"Potentially dangerous character in argument: {arg}")
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=cwd,
+        env=env,
+        shell=False,  # Never use shell=True
+    )
+
+    return result.returncode, result.stdout, result.stderr
+
+
+def safe_deserialize_json(json_str: str, max_size: int = 1024 * 1024) -> dict:
+    """
+    Safely deserialize JSON with size limit.
+
+    Args:
+        json_str: JSON string to parse
+        max_size: Maximum allowed size in bytes
+
+    Returns:
+        Parsed JSON object
+
+    Raises:
+        ValueError: If JSON is too large or invalid
+    """
+    import json
+
+    if len(json_str.encode()) > max_size:
+        raise ValueError(f"JSON payload exceeds maximum size of {max_size} bytes")
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON: {e}")
