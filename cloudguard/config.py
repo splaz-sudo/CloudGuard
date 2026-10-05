@@ -46,9 +46,38 @@ class Settings:
     aws_profile: str = ""
     aws_regions: tuple[str, ...] = ()
 
+    # Cross-account scanning configuration
+    # Format: "account_id:role_arn:external_id:session_name"
+    # Multiple accounts separated by semicolons
+    aws_cross_account_roles: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    def parse_cross_account_roles(self) -> list[dict]:
+        """Parse cross-account role configuration string."""
+        if not self.aws_cross_account_roles:
+            return []
+
+        roles = []
+        for entry in self.aws_cross_account_roles.split(";"):
+            entry = entry.strip()
+            if not entry:
+                continue
+
+            parts = entry.split(":")
+            if len(parts) < 2:
+                continue
+
+            roles.append({
+                "account_id": parts[0].strip(),
+                "role_arn": parts[1].strip(),
+                "external_id": parts[2].strip() if len(parts) > 2 else None,
+                "session_name": parts[3].strip() if len(parts) > 3 else "CloudGuardScan",
+            })
+
+        return roles
 
 
 def load_settings() -> Settings:

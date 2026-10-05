@@ -531,6 +531,9 @@ class ScanService:
             self.settings.aws_profile or None
         )
 
+        # Parse cross-account roles from configuration
+        cross_account_roles = self.settings.parse_cross_account_roles()
+
         regions = (
             record.regions
             or list(
@@ -583,6 +586,41 @@ class ScanService:
                 or "us-east-1"
             ]
 
+        # Assume cross-account roles
+        account_sessions = {}
+
+        for role_config in cross_account_roles:
+            try:
+                assumed_session = self._assume_role(
+                    identity_session,
+                    role_config,
+                    retry_config,
+                )
+                account_sessions[role_config["account_id"]] = {
+                    "session": assumed_session,
+                    "regions": regions,
+                    "identity": role_config,
+                }
+            except Exception as error:
+                logger.warning(
+                    "Cross-account role assumption failed",
+                    extra={
+                        "event": "cross_account_failed",
+                        "scan_id": record.scan_id,
+                        "account_id": role_config["account_id"],
+                        "error_type": type(error).__name__,
+                        "error_message": str(error)[:300],
+                    },
+                )
+
+        # Primary account (identity account) uses the original identity session
+        primary_account_id = identity.account_id
+        account_sessions[primary_account_id] = {
+            "session": identity_session,
+            "regions": regions,
+            "identity": {"account_id": primary_account_id},
+        }
+
         instances = []
         security_groups = []
         buckets = []
@@ -601,23 +639,23 @@ class ScanService:
                 and cancel_event.is_set()
             )
 
-        for region in regions:
-            if cancelled():
-                raise RuntimeError(
-                    "Scan cancelled by user."
-                )
+        for account_id, account_data in account_sessions.items():
+            session = account_data["session"]
+            account_regions = account_data["regions"]
+            account_identity = account_data["identity"]
 
-            record.regions_attempted.append(region)
+            for region in account_regions:
+                if cancelled():
+                    raise RuntimeError(
+                        "Scan cancelled by user."
+                    )
+
+                record.regions_attempted.append(region)
 
             region_ec2_success = False
             region_ec2_failed = False
 
             try:
-                session = AWSSession(
-                    profile_name=profile,
-                    region_name=region,
-                )
-
                 ec2 = EC2Collector(
                     session,
                     retry_config=retry_config,
