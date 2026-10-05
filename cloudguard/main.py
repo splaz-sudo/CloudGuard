@@ -4,6 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from cloudguard.api.errors import (
     unhandled_exception_handler,
 )
+from cloudguard.api.hardening import (
+    RateLimitMiddleware,
+    RequestSizeLimitMiddleware,
+    RequestValidationMiddleware,
+)
 from cloudguard.api.middleware import (
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
@@ -47,6 +52,18 @@ app.add_exception_handler(
 
 app.add_middleware(
     SecurityHeadersMiddleware
+)
+
+app.add_middleware(
+    RequestValidationMiddleware
+)
+
+app.add_middleware(
+    RequestSizeLimitMiddleware
+)
+
+app.add_middleware(
+    RateLimitMiddleware
 )
 
 app.add_middleware(
