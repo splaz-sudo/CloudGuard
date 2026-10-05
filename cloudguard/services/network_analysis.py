@@ -2,11 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
+from cloudguard.collectors.networking import (
+    LoadBalancer,
+    TargetGroup,
+)
+from cloudguard.inference.network_exposure import (
+    ExposureEvidence,
+    ExposureType,
+    NetworkExposureEngine2,
+)
 from cloudguard.inference.network_risk import (
     ExposedService,
     NetworkRisk,
     calculate_network_risk,
 )
+from cloudguard.models.assets import AssetType
 
 
 class NetworkAnalysisService:
@@ -28,6 +38,7 @@ class NetworkAnalysisService:
         analysis_result: Any,
         instances: list[Any],
         security_groups: list[Any],
+        environment: Any = None,
     ) -> list[NetworkRisk]:
 
         groups_by_id = {
@@ -37,13 +48,33 @@ class NetworkAnalysisService:
 
         risks: list[NetworkRisk] = []
 
+        # Use NetworkExposureEngine2 if we have full environment data
+        exposure_engine = None
+        if environment is not None:
+            try:
+                exposure_engine = NetworkExposureEngine2(
+                    vpcs=getattr(environment, "vpcs", []),
+                    subnets=getattr(environment, "subnets", []),
+                    route_tables=getattr(environment, "route_tables", []),
+                    internet_gateways=getattr(environment, "internet_gateways", []),
+                    nat_gateways=getattr(environment, "nat_gateways", []),
+                    network_acls=getattr(environment, "network_acls", []),
+                    network_interfaces=getattr(environment, "network_interfaces", []),
+                    elastic_ips=getattr(environment, "elastic_ips", []),
+                    load_balancers=getattr(environment, "load_balancers", []),
+                    target_groups=getattr(environment, "target_groups", []),
+                    security_groups=security_groups,
+                    instances=instances,
+                )
+            except Exception:
+                exposure_engine = None
+
         for instance in instances:
             risk = self._analyze_instance(
-                analysis_result=(
-                    analysis_result
-                ),
+                analysis_result=analysis_result,
                 instance=instance,
                 groups_by_id=groups_by_id,
+                exposure_engine=exposure_engine,
             )
 
             risks.append(risk)
@@ -63,6 +94,7 @@ class NetworkAnalysisService:
         analysis_result: Any,
         instance: Any,
         groups_by_id: dict[str, Any],
+        exposure_engine: Any = None,
     ) -> NetworkRisk:
 
         graph = (
@@ -162,6 +194,20 @@ class NetworkAnalysisService:
                 attack_paths,
             )
         )
+
+        # Use exposure engine for enhanced evidence if available
+        exposure_evidence = None
+        if exposure_engine is not None:
+            # Create a mock asset for the instance
+            from cloudguard.models.assets import CloudAsset, AssetType
+            mock_asset = CloudAsset(
+                id=instance.instance_id,
+                name=instance.instance_id,
+                asset_type=AssetType.EC2,
+                account_id="",
+                region=instance.region,
+            )
+            exposure_evidence = exposure_engine.analyze_exposure(mock_asset)
 
         return calculate_network_risk(
             asset_id=instance.instance_id,
