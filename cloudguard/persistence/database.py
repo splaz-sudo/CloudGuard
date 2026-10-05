@@ -147,6 +147,52 @@ SCHEMA_STATEMENTS = (
 )
 
 
+class QueryResult:
+    """
+    Cursor-compatible view of rows that were
+    read while the connection lock was still
+    held.
+
+    Repository code uses this exactly like a
+    sqlite3.Cursor: ``fetchone()``,
+    ``fetchall()``, iteration and ``rowcount``.
+    It holds plain Python values, so it stays
+    valid no matter what other threads do to
+    the shared connection afterwards.
+    """
+
+    __slots__ = ("_rows", "_rowcount", "_offset")
+
+    def __init__(
+        self,
+        rows: list[sqlite3.Row],
+        rowcount: int,
+    ) -> None:
+        self._rows = rows
+        self._rowcount = rowcount
+        self._offset = 0
+
+    @property
+    def rowcount(self) -> int:
+        return self._rowcount
+
+    def fetchone(self) -> sqlite3.Row | None:
+        if self._offset >= len(self._rows):
+            return None
+
+        row = self._rows[self._offset]
+        self._offset += 1
+        return row
+
+    def fetchall(self) -> list[sqlite3.Row]:
+        rows = self._rows[self._offset:]
+        self._offset = len(self._rows)
+        return rows
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+
 class Database:
     def __init__(
         self,
@@ -229,14 +275,41 @@ class Database:
         self,
         sql: str,
         parameters: tuple = (),
-    ) -> sqlite3.Cursor:
+    ) -> QueryResult:
+        """
+        Run a statement and return its rows.
+
+        The connection is shared by every worker
+        thread, so the result set must be read
+        *inside* the lock. A sqlite3.Cursor that
+        is consumed after another thread has
+        executed a statement on the same
+        connection can report an empty row, a
+        partially decoded row or raise an
+        InterfaceError - which surfaced to the
+        API as intermittent 404/500 responses
+        for scans that demonstrably exist.
+
+        Rows are therefore materialized here and
+        handed back as a cursor-like object that
+        no longer touches the connection.
+        """
         with self._lock:
             cursor = self._connection.execute(
                 sql,
                 parameters,
             )
+
+            rowcount = cursor.rowcount
+            rows = (
+                cursor.fetchall()
+                if cursor.description is not None
+                else []
+            )
+
             self._connection.commit()
-            return cursor
+
+            return QueryResult(rows, rowcount)
 
     def executemany(
         self,

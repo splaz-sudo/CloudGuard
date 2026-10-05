@@ -33,4 +33,5 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.log
+*.logcloudguard.db-shm
+cloudguard.db-wal

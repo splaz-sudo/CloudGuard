@@ -16,7 +16,31 @@ from collections import defaultdict
 from typing import Optional
 
 from fastapi import Request, Response, HTTPException
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+
+def reject(
+    status_code: int,
+    detail: str,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    """
+    Build a rejection response from middleware.
+
+    Every middleware below runs *outside*
+    FastAPI's ExceptionMiddleware, so raising
+    HTTPException here would propagate to the
+    server-error handler and come back as an
+    opaque 500. Returning the response keeps
+    the real status code (429/413/414/431/405)
+    visible to clients.
+    """
+    return JSONResponse(
+        status_code=status_code,
+        content={"detail": detail},
+        headers=headers,
+    )
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -30,9 +54,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app,
-        requests_per_minute: int = 60,
-        requests_per_hour: int = 1000,
-        burst_allowance: int = 10,
+        requests_per_minute: int = 300,
+        requests_per_hour: int = 6000,
+        burst_allowance: int = 60,
     ):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
@@ -48,9 +72,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Check rate limits
         if not self._check_rate_limit(client_ip):
-            raise HTTPException(
-                status_code=429,
-                detail="Rate limit exceeded. Please slow down.",
+            return reject(
+                429,
+                "Rate limit exceeded. Please slow down.",
+                {
+                    "Retry-After": "60",
+                    "X-RateLimit-Limit-Minute": str(
+                        self.requests_per_minute
+                    ),
+                    "X-RateLimit-Remaining-Minute": "0",
+                },
             )
 
         response = await call_next(request)
@@ -147,9 +178,9 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             try:
                 length = int(content_length)
                 if length > self.max_size_bytes:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=(
+                    return reject(
+                        413,
+                        (
                             f"Request body too large. "
                             f"Maximum size: {self.max_size_bytes} bytes"
                         ),
@@ -192,31 +223,22 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Validate HTTP method
         if request.method not in self.ALLOWED_METHODS:
-            raise HTTPException(
-                status_code=405,
-                detail=f"Method {request.method} not allowed",
+            return reject(
+                405,
+                f"Method {request.method} not allowed",
             )
 
         # Validate URL length
         if len(str(request.url)) > self.MAX_URL_LENGTH:
-            raise HTTPException(
-                status_code=414,
-                detail="URL too long",
-            )
+            return reject(414, "URL too long")
 
         # Validate headers
         if len(request.headers) > self.MAX_HEADER_COUNT:
-            raise HTTPException(
-                status_code=431,
-                detail="Too many headers",
-            )
+            return reject(431, "Too many headers")
 
         for name, value in request.headers.items():
             if len(name) + len(value) > self.MAX_HEADER_SIZE:
-                raise HTTPException(
-                    status_code=431,
-                    detail="Header too large",
-                )
+                return reject(431, "Header too large")
 
         response = await call_next(request)
         return response
