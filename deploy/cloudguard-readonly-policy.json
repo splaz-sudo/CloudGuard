@@ -1,0 +1,82 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudGuardRequiredSts",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudGuardRequiredEc2",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeSecurityGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudGuardRequiredS3",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBuckets",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudGuardRequiredIam",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListRoles",
+        "iam:ListAttachedRolePolicies",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:ListUsers",
+        "iam:ListAttachedUserPolicies",
+        "iam:ListInstanceProfiles"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudGuardOptionalS3",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetPublicAccessBlock",
+        "s3:GetBucketPolicyStatus",
+        "s3:GetBucketTagging"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudGuardOptionalEc2Network",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeInternetGateways",
+        "ec2:DescribeNatGateways",
+        "ec2:DescribeNetworkAcls",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeAddresses"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudGuardOptionalIamDetails",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListGroups",
+        "iam:ListGroupPolicies",
+        "iam:ListRolePolicies",
+        "iam:ListUserPolicies",
+        "iam:GetRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
