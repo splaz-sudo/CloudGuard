@@ -16,6 +16,7 @@ import Findings from "./pages/Findings";
 import Identity from "./pages/Identity";
 import Inventory from "./pages/Inventory";
 import Network from "./pages/Network";
+import Coverage from "./pages/Coverage";
 import Overview from "./pages/Overview";
 import Remediations from "./pages/Remediations";
 import Reports from "./pages/Reports";
@@ -76,6 +77,11 @@ function App() {
             <Route
               path="/compliance"
               element={<Compliance />}
+            />
+
+            <Route
+              path="/coverage"
+              element={<Coverage />}
             />
 
             <Route

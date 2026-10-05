@@ -32,6 +32,20 @@ export interface SeverityCounts {
 }
 
 
+export interface CollectorResult {
+  collector: string;
+  service: string;
+  region: string | null;
+  status: 'success' | 'partial' | 'failed';
+  resources_discovered: number;
+  duration_ms: number;
+  error_category: string | null;
+  error_message: string | null;
+  coverage_limitation: string | null;
+  data: any[];
+}
+
+
 export interface Overview {
   mode: string;
   scan_id: string;

@@ -103,6 +103,13 @@ function Layout() {
           </NavLink>
 
           <NavLink
+            to="/coverage"
+            className={navClass}
+          >
+            Coverage
+          </NavLink>
+
+          <NavLink
             to="/reports"
             className={navClass}
           >

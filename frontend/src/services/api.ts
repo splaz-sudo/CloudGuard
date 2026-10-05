@@ -1,6 +1,7 @@
 import type {
   AttackPath,
   CloudAsset,
+  CollectorResult,
   ComparisonResult,
   ComplianceReport,
   Finding,
@@ -451,6 +452,15 @@ export function getScanCompliance(
 ): Promise<ComplianceReport> {
   return request<ComplianceReport>(
     scanUrl(scanId, "/compliance"),
+  );
+}
+
+
+export function getScanCollectorResults(
+  scanId: string,
+): Promise<CollectorResult[]> {
+  return request<CollectorResult[]>(
+    scanUrl(scanId, "/collector-results"),
   );
 }
 
