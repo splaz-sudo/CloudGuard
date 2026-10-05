@@ -1,0 +1,106 @@
+/* ============================================
+   Scans page — scan history
+   ============================================ */
+
+/* --- Run-scan controls in the topbar --- */
+
+.scan-run {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.scan-run .form-field {
+  margin: 0;
+}
+
+/* --- Table header row --- */
+
+.scans-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+
+.scans-table-head .section-title {
+  margin-bottom: 0;
+}
+
+/* --- Table specifics --- */
+
+.scans-table th.num {
+  text-align: right;
+}
+
+.scans-table .riskbar-with-value {
+  min-width: 140px;
+}
+
+.scans-table td.scan-id-cell {
+  max-width: 180px;
+}
+
+.scans-table td.scan-id-cell .scan-id {
+  display: block;
+}
+
+/* Keyboard focus for clickable rows */
+
+.scans-table tbody tr.clickable:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+/* --- Cell layouts --- */
+
+.scan-env {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.scan-env-name {
+  font-weight: 550;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.scan-time {
+  display: block;
+  font-weight: 550;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.scan-time-rel {
+  display: block;
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+/* --- Loading skeleton --- */
+
+.scans-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 768px) {
+  .scan-run,
+  .scan-run .form-field,
+  .scan-run .select-wrapper,
+  .scan-run .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}

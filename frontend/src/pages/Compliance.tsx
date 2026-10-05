@@ -1,10 +1,26 @@
+import "../styles/compliance.css";
+
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
 
+import Icon from "../components/Icon";
+
 import {
+  EmptyState,
+  ErrorState,
+  SkeletonCard,
+} from "../components/StateBlock";
+
+import {
+  Select,
+} from "../components/FormControls";
+
+import {
+  CloudGuardAPIError,
   getScanCompliance,
 } from "../services/api";
 
@@ -18,6 +34,20 @@ import type {
 } from "../types/cloudguard";
 
 
+const STATUS_FILTERS = [
+  { value: "ALL", label: "All statuses" },
+  { value: "COMPLIANT", label: "Compliant" },
+  {
+    value: "NON_COMPLIANT",
+    label: "Non-Compliant",
+  },
+  {
+    value: "NOT_ASSESSED",
+    label: "Not Assessed",
+  },
+];
+
+
 function Compliance() {
   const { selectedScan } =
     useScanContext();
@@ -28,65 +58,114 @@ function Compliance() {
   const [report, setReport] =
     useState<ComplianceReport | null>(null);
 
-  const [
-    selectedControl,
-    setSelectedControl,
-  ] = useState<ComplianceControl | null>(
-    null,
-  );
-
-  const [
-    selectedFramework,
-    setSelectedFramework,
-  ] = useState("ALL");
-
   const [loading, setLoading] =
     useState(true);
 
   const [error, setError] =
-    useState<string | null>(null);
+    useState<CloudGuardAPIError | null>(null);
+
+  const [frameworkFilter, setFrameworkFilter] =
+    useState("ALL");
+
+  const [statusFilter, setStatusFilter] =
+    useState("ALL");
 
 
-  useEffect(() => {
-    if (!scanId) {
-      return;
-    }
+  const loadCompliance =
+    useCallback(async () => {
+      if (!scanId) {
+        return;
+      }
 
-    const currentScanId: string = scanId;
-
-    async function loadCompliance() {
       setLoading(true);
       setError(null);
 
       try {
         const data =
-          await getScanCompliance(currentScanId);
+          await getScanCompliance(scanId);
 
         setReport(data);
-
-        if (data.controls.length > 0) {
-          setSelectedControl(
-            data.controls[0],
-          );
-        } else {
-          setSelectedControl(null);
-        }
       } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : (
-              "Unable to load " +
-              "compliance data."
+        if (
+          requestError
+          instanceof CloudGuardAPIError
+        ) {
+          setError(requestError);
+        } else {
+          setError(
+            new CloudGuardAPIError(
+              "Unable to load compliance data.",
             ),
-        );
+          );
+        }
       } finally {
         setLoading(false);
       }
+    }, [scanId]);
+
+
+  useEffect(() => {
+    void loadCompliance();
+  }, [loadCompliance]);
+
+
+  const frameworkOptions = useMemo(() => {
+    if (!report) {
+      return [
+        {
+          value: "ALL",
+          label: "All frameworks",
+        },
+      ];
     }
 
-    loadCompliance();
-  }, [scanId]);
+    return [
+      {
+        value: "ALL",
+        label: "All frameworks",
+      },
+      ...report.frameworks.map(
+        (framework) => ({
+          value: framework.framework,
+          label: framework.framework,
+        }),
+      ),
+    ];
+  }, [report]);
+
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      COMPLIANT: 0,
+      NON_COMPLIANT: 0,
+      NOT_ASSESSED: 0,
+      UNKNOWN: 0,
+    };
+
+    if (!report) {
+      return counts;
+    }
+
+    for (const control of report.controls) {
+      // Widen to string: the API type only
+      // lists two statuses, but a compliant
+      // or unrecognized status must still
+      // be counted, not misclassified.
+      const status: string = control.status;
+
+      if (
+        status === "COMPLIANT"
+        || status === "NON_COMPLIANT"
+        || status === "NOT_ASSESSED"
+      ) {
+        counts[status] += 1;
+      } else {
+        counts.UNKNOWN += 1;
+      }
+    }
+
+    return counts;
+  }, [report]);
 
 
   const controls = useMemo(() => {
@@ -94,564 +173,500 @@ function Compliance() {
       return [];
     }
 
-    if (selectedFramework === "ALL") {
-      return report.controls;
-    }
-
     return report.controls.filter(
-      (control) =>
-        control.framework ===
-        selectedFramework,
+      (control) => {
+        if (
+          frameworkFilter !== "ALL"
+          && control.framework
+            !== frameworkFilter
+        ) {
+          return false;
+        }
+
+        if (
+          statusFilter !== "ALL"
+          && control.status !== statusFilter
+        ) {
+          return false;
+        }
+
+        return true;
+      },
     );
-  }, [
-    report,
-    selectedFramework,
-  ]);
+  }, [report, frameworkFilter, statusFilter]);
 
 
-  const metrics = useMemo(() => {
-    if (!report) {
-      return {
-        frameworks: 0,
-        controls: 0,
-        nonCompliant: 0,
-        mappedFindings: 0,
-      };
-    }
+  const pageHeader = (
+    <header className="topbar">
+      <div>
+        <p className="eyebrow">
+          Compliance Mapping
+        </p>
 
-    return {
-      frameworks:
-        report.frameworks.length,
+        <h2>
+          Compliance &amp; Controls
+        </h2>
 
-      controls:
-        report.controls.length,
+        <p className="page-subtitle">
+          Evidence-based mappings between
+          CloudGuard security findings and
+          relevant security framework
+          controls.
+        </p>
+      </div>
 
-      nonCompliant:
-        report.controls.filter(
-          (control) =>
-            control.status ===
-            "NON_COMPLIANT",
-        ).length,
-
-      mappedFindings:
-        report.mapped_findings,
-    };
-  }, [report]);
+      <span className="badge badge-info badge-lg no-dot">
+        Local assessment
+      </span>
+    </header>
+  );
 
 
   if (loading) {
     return (
-      <section className="page-state">
-        Loading compliance mappings...
-      </section>
+      <div className="page">
+        {pageHeader}
+
+        <div
+          className="comp-loading"
+          aria-busy="true"
+          aria-label="Loading compliance data"
+        >
+          <SkeletonCard lines={3} />
+          <SkeletonCard lines={2} />
+          <SkeletonCard lines={2} />
+        </div>
+      </div>
     );
   }
 
 
   if (error || !report) {
     return (
-      <section
-        className="page-state error-message"
-      >
-        {error ??
-          "Compliance report unavailable."}
-      </section>
+      <div className="page">
+        {pageHeader}
+
+        <ErrorState
+          error={
+            error
+            ?? new CloudGuardAPIError(
+              "Compliance report unavailable.",
+            )
+          }
+          resourceLabel="compliance data"
+          onRetry={() => {
+            void loadCompliance();
+          }}
+        />
+      </div>
     );
   }
 
 
   return (
-    <>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">
-            COMPLIANCE MAPPING
-          </p>
+    <div className="page">
+      {pageHeader}
 
-          <h2>
-            Compliance & Controls
-          </h2>
-
-          <p className="subtitle">
-            Evidence-based mappings between
-            CloudGuard security findings and
-            relevant security framework
-            controls.
-          </p>
-        </div>
-
-        <div className="environment-badge">
-          LOCAL ASSESSMENT
-        </div>
-      </header>
-
-
-      <section className="compliance-metrics">
-        <Metric
-          label="Frameworks"
-          value={metrics.frameworks}
+      <section
+        className="stat-grid"
+        aria-label="Control status summary"
+      >
+        <StatusStat
+          label="Compliant"
+          value={statusCounts.COMPLIANT}
+          tone="success"
         />
 
-        <Metric
-          label="Mapped Controls"
-          value={metrics.controls}
-        />
-
-        <Metric
+        <StatusStat
           label="Non-Compliant"
-          value={metrics.nonCompliant}
+          value={statusCounts.NON_COMPLIANT}
           tone="danger"
         />
 
-        <Metric
+        <StatusStat
+          label="Not Assessed"
+          value={statusCounts.NOT_ASSESSED}
+          tone="neutral"
+        />
+
+        <StatusStat
+          label="Unknown"
+          value={statusCounts.UNKNOWN}
+          tone="info"
+        />
+
+        <StatusStat
+          label="Frameworks"
+          value={report.frameworks.length}
+        />
+
+        <StatusStat
           label="Mapped Findings"
-          value={metrics.mappedFindings}
+          value={report.mapped_findings}
         />
       </section>
 
-
-      <section className="compliance-frameworks">
-        {report.frameworks.map(
-          (framework) => (
-            <button
-              type="button"
-              key={framework.framework}
-              className={
-                selectedFramework ===
-                framework.framework
-                  ? (
-                    "framework-card " +
-                    "selected"
-                  )
-                  : "framework-card"
-              }
-              onClick={() => {
-                setSelectedFramework(
-                  framework.framework,
-                );
-
-                const first =
-                  report.controls.find(
-                    (control) =>
-                      control.framework ===
-                      framework.framework,
-                  );
-
-                if (first) {
-                  setSelectedControl(first);
-                }
-              }}
-            >
-              <div>
-                <span>
-                  FRAMEWORK
-                </span>
-
-                <strong>
+      {report.frameworks.length > 0 && (
+        <div
+          className="chip-row"
+          aria-label="Framework summaries"
+        >
+          {report.frameworks.map(
+            (framework) => (
+              <span
+                className="chip"
+                key={framework.framework}
+              >
+                <strong className="strong">
                   {framework.framework}
                 </strong>
-              </div>
-
-              <div className="framework-stats">
-                <span>
-                  {
-                    framework
-                      .total_controls
-                  }{" "}
-                  controls
-                </span>
-
-                <span className="framework-danger">
-                  {
-                    framework
-                      .non_compliant
-                  }{" "}
-                  flagged
-                </span>
-              </div>
-            </button>
-          ),
-        )}
-      </section>
-
-
-      <div className="compliance-filter-row">
-        <button
-          type="button"
-          className={
-            selectedFramework === "ALL"
-              ? "compliance-filter active"
-              : "compliance-filter"
-          }
-          onClick={() => {
-            setSelectedFramework("ALL");
-
-            if (
-              report.controls.length > 0
-            ) {
-              setSelectedControl(
-                report.controls[0],
-              );
-            }
-          }}
-        >
-          ALL CONTROLS
-        </button>
-
-        {report.frameworks.map(
-          (framework) => (
-            <button
-              type="button"
-              key={
-                `filter-${framework.framework}`
-              }
-              className={
-                selectedFramework ===
-                framework.framework
-                  ? (
-                    "compliance-filter " +
-                    "active"
-                  )
-                  : "compliance-filter"
-              }
-              onClick={() => {
-                setSelectedFramework(
-                  framework.framework,
-                );
-
-                const first =
-                  report.controls.find(
-                    (control) =>
-                      control.framework ===
-                      framework.framework,
-                  );
-
-                if (first) {
-                  setSelectedControl(first);
-                }
-              }}
-            >
-              {framework.framework}
-            </button>
-          ),
-        )}
-      </div>
-
-
-      <section className="compliance-layout">
-        <div className="compliance-list-panel">
-          <div className="compliance-list-header">
-            <div>
-              <p className="eyebrow">
-                CONTROL ASSESSMENT
-              </p>
-
-              <h3>
-                Mapped Controls
-              </h3>
-            </div>
-
-            <span>
-              {controls.length}
-            </span>
-          </div>
-
-
-          <div className="compliance-list">
-            {controls.map(
-              (control) => (
-                <button
-                  type="button"
-                  key={
-                    `${control.framework}-${control.control_id}`
-                  }
-                  className={
-                    selectedControl
-                      ?.control_id ===
-                      control.control_id &&
-                    selectedControl
-                      ?.framework ===
-                      control.framework
-                      ? (
-                        "compliance-list-item " +
-                        "selected"
-                      )
-                      : (
-                        "compliance-list-item"
-                      )
-                  }
-                  onClick={() =>
-                    setSelectedControl(
-                      control,
-                    )
-                  }
-                >
-                  <div>
-                    <div className="control-list-meta">
-                      <span className="control-id">
-                        {control.control_id}
-                      </span>
-
-                      <StatusBadge
-                        status={
-                          control.status
-                        }
-                      />
-                    </div>
-
-                    <strong>
-                      {control.title}
-                    </strong>
-
-                    <small>
-                      {control.framework}
-                    </small>
-                  </div>
-                </button>
-              ),
-            )}
-          </div>
-        </div>
-
-
-        <div className="compliance-details-panel">
-          {selectedControl ? (
-            <ControlDetails
-              control={selectedControl}
-            />
-          ) : (
-            <div className="empty-state">
-              Select a compliance control
-              to inspect its evidence.
-            </div>
+                {framework.total_controls}{" "}
+                controls &middot;{" "}
+                {framework.non_compliant}{" "}
+                flagged &middot;{" "}
+                {framework.not_assessed} not
+                assessed
+              </span>
+            ),
           )}
         </div>
-      </section>
+      )}
 
+      <div className="toolbar">
+        <Select
+          label="Framework"
+          value={frameworkFilter}
+          onChange={setFrameworkFilter}
+          options={frameworkOptions}
+        />
 
-      <div className="compliance-disclaimer">
-        CloudGuard reports evidence-based
-        mappings for the controls represented
-        by its current security analysis.
-        This view is not a complete compliance
-        audit, certification, or attestation.
-        Controls without sufficient evidence
-        are not assumed to be compliant.
+        <Select
+          label="Status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={STATUS_FILTERS}
+        />
+
+        <span className="toolbar-spacer" />
+
+        <p className="comp-count">
+          Showing {controls.length} of{" "}
+          {report.controls.length} controls
+        </p>
       </div>
-    </>
+
+      {report.controls.length === 0 ? (
+        <EmptyState
+          icon="shield"
+          title="No compliance mappings"
+          body="No framework controls were mapped to the findings in this scan."
+        />
+      ) : controls.length === 0 ? (
+        <EmptyState
+          icon="search"
+          title="No controls match these filters"
+          body="Try widening the framework or status filter to see more controls."
+        />
+      ) : (
+        <section
+          className="comp-list"
+          aria-label="Control assessment"
+        >
+          {controls.map((control, index) => (
+            <ControlRow
+              key={`${control.framework}-${control.control_id}`}
+              control={control}
+              defaultOpen={index === 0}
+            />
+          ))}
+        </section>
+      )}
+
+      <div
+        className="comp-disclaimer"
+        role="note"
+      >
+        <Icon name="info" size={15} />
+
+        <p>
+          CloudGuard reports evidence-based
+          mappings for the controls
+          represented by its current
+          security analysis. This view is
+          not a complete compliance audit,
+          certification, or attestation.
+          Controls without sufficient
+          evidence are not assumed to be
+          compliant.
+        </p>
+      </div>
+    </div>
   );
 }
 
 
-function Metric({
+function StatusStat({
   label,
   value,
-  tone = "",
+  tone,
 }: {
   label: string;
   value: number;
-  tone?: string;
+  tone?:
+    | "success"
+    | "danger"
+    | "neutral"
+    | "info";
 }) {
   return (
-    <article
+    <div
       className={
-        `compliance-metric ${tone}`
+        tone
+          ? `stat comp-stat-${tone}`
+          : "stat"
       }
     >
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+      <span className="stat-label">
+        {label}
+      </span>
+
+      <p className="stat-value">{value}</p>
+    </div>
   );
 }
 
 
+/**
+ * Four visually distinct status treatments,
+ * always paired with a text label so status
+ * is never conveyed by color alone.
+ */
 function StatusBadge({
   status,
 }: {
   status: string;
 }) {
-  const statusClass =
-    status
-      .toLowerCase()
-      .replaceAll("_", "-");
+  const meta = STATUS_BADGES[status] ?? {
+    badgeClass: "badge-info",
+    label: "Unknown",
+    raw: status,
+  };
 
   return (
     <span
-      className={
-        `compliance-status ${statusClass}`
+      className={`badge ${meta.badgeClass}`}
+      title={
+        meta.label === "Unknown"
+          ? `Unrecognized status: ${meta.raw}`
+          : undefined
       }
     >
-      {status.replaceAll("_", " ")}
+      {meta.label}
     </span>
   );
 }
 
 
-function ControlDetails({
+const STATUS_BADGES: Record<
+  string,
+  {
+    badgeClass: string;
+    label: string;
+    raw?: string;
+  }
+> = {
+  COMPLIANT: {
+    badgeClass: "badge-success",
+    label: "Compliant",
+  },
+  NON_COMPLIANT: {
+    badgeClass: "badge-danger",
+    label: "Non-Compliant",
+  },
+  NOT_ASSESSED: {
+    badgeClass: "badge-neutral",
+    label: "Not Assessed",
+  },
+};
+
+
+function ControlRow({
   control,
+  defaultOpen,
 }: {
   control: ComplianceControl;
+  defaultOpen: boolean;
 }) {
   return (
-    <>
-      <div className="compliance-detail-header">
-        <div>
-          <div className="control-heading-meta">
-            <span className="control-id">
-              {control.control_id}
-            </span>
+    <details
+      className="comp-row"
+      open={defaultOpen}
+    >
+      <summary className="comp-row-summary">
+        <Icon
+          name="chevron-right"
+          size={15}
+          className="comp-chev"
+        />
 
-            <StatusBadge
-              status={control.status}
-            />
-          </div>
+        <span className="comp-row-main">
+          <span className="mono comp-id">
+            {control.control_id}
+          </span>
 
-          <h3>
+          <span className="comp-title">
             {control.title}
-          </h3>
+          </span>
+        </span>
 
-          <p>
-            {control.framework}
+        <span className="chip comp-framework">
+          {control.framework}
+        </span>
+
+        <StatusBadge
+          status={control.status}
+        />
+      </summary>
+
+      <div className="comp-row-body">
+        <section className="comp-section">
+          <p className="comp-label">
+            Control objective
           </p>
-        </div>
-      </div>
 
+          <p className="comp-text">
+            {control.description}
+          </p>
+        </section>
 
-      <section className="compliance-section">
-        <p className="details-section-title">
-          Control Objective
-        </p>
-
-        <p className="details-text">
-          {control.description}
-        </p>
-      </section>
-
-
-      <section className="compliance-section">
-        <p className="details-section-title">
-          Related Findings
-        </p>
-
-        <div className="compliance-chip-list">
-          {control.related_findings.length >
-          0 ? (
-            control.related_findings.map(
-              (finding) => (
-                <span
-                  className="compliance-chip finding-chip"
-                  key={finding}
-                >
-                  {finding}
-                </span>
-              ),
-            )
-          ) : (
-            <p className="details-text">
-              No related findings were
-              observed.
+        <div className="comp-columns">
+          <section className="comp-section">
+            <p className="comp-label">
+              Related findings (
+              {control.related_findings.length}
+              )
             </p>
-          )}
-        </div>
-      </section>
 
+            {control.related_findings.length
+            > 0 ? (
+              <div className="chip-row">
+                {control.related_findings.map(
+                  (finding) => (
+                    <span
+                      className="chip"
+                      key={finding}
+                    >
+                      <span className="mono">
+                        {finding}
+                      </span>
+                    </span>
+                  ),
+                )}
+              </div>
+            ) : (
+              <p className="comp-text muted">
+                No related findings were
+                observed.
+              </p>
+            )}
+          </section>
 
-      <section className="compliance-section">
-        <p className="details-section-title">
-          Affected Assets
-        </p>
-
-        <div className="compliance-chip-list">
-          {control.affected_assets.length >
-          0 ? (
-            control.affected_assets.map(
-              (asset) => (
-                <span
-                  className="compliance-chip"
-                  key={asset}
-                >
-                  {asset}
-                </span>
-              ),
-            )
-          ) : (
-            <p className="details-text">
-              No affected assets identified.
+          <section className="comp-section">
+            <p className="comp-label">
+              Affected assets (
+              {control.affected_assets.length})
             </p>
-          )}
+
+            {control.affected_assets.length
+            > 0 ? (
+              <div className="chip-row">
+                {control.affected_assets.map(
+                  (asset) => (
+                    <span
+                      className="chip"
+                      key={asset}
+                    >
+                      <span className="mono">
+                        {asset}
+                      </span>
+                    </span>
+                  ),
+                )}
+              </div>
+            ) : (
+              <p className="comp-text muted">
+                No affected assets
+                identified.
+              </p>
+            )}
+          </section>
         </div>
-      </section>
 
+        <section className="comp-section">
+          <p className="comp-label">
+            Evidence (
+            {control.evidence.length})
+          </p>
 
-      <section className="compliance-section">
-        <p className="details-section-title">
-          Evidence
-        </p>
-
-        <div className="compliance-evidence-list">
           {control.evidence.length > 0 ? (
-            control.evidence.map(
-              (evidence, index) => (
-                <div
-                  className="compliance-evidence"
-                  key={
-                    `${control.control_id}-evidence-${index}`
-                  }
-                >
-                  <span>
-                    {index + 1}
-                  </span>
+            <ul className="comp-evidence">
+              {control.evidence.map(
+                (evidence, index) => (
+                  <li
+                    key={`${control.control_id}-evidence-${index}`}
+                  >
+                    <span
+                      className="comp-evidence-index"
+                      aria-hidden="true"
+                    >
+                      {index + 1}
+                    </span>
 
-                  <p>
-                    {evidence}
-                  </p>
-                </div>
-              ),
-            )
+                    <p>{evidence}</p>
+                  </li>
+                ),
+              )}
+            </ul>
           ) : (
-            <p className="details-text">
+            <p className="comp-text muted">
               This control has not been
               assessed with sufficient
               evidence.
             </p>
           )}
-        </div>
-      </section>
+        </section>
 
+        <section className="comp-section">
+          <p className="comp-label">
+            Recommended remediation
+          </p>
 
-      <section className="compliance-section">
-        <p className="details-section-title">
-          Recommended Remediation
-        </p>
+          {control.remediation.length > 0 ? (
+            <ul className="comp-guidance">
+              {control.remediation.map(
+                (item, index) => (
+                  <li
+                    key={`${control.control_id}-remediation-${index}`}
+                  >
+                    <Icon
+                      name="check"
+                      size={14}
+                    />
 
-        <div className="compliance-remediation-list">
-          {control.remediation.length >
-          0 ? (
-            control.remediation.map(
-              (item, index) => (
-                <div
-                  className="compliance-remediation"
-                  key={
-                    `${control.control_id}-remediation-${index}`
-                  }
-                >
-                  <span>✓</span>
-
-                  <p>
-                    {item}
-                  </p>
-                </div>
-              ),
-            )
+                    <p>{item}</p>
+                  </li>
+                ),
+              )}
+            </ul>
           ) : (
-            <p className="details-text">
+            <p className="comp-text muted">
               No remediation guidance is
               currently available.
             </p>
           )}
-        </div>
-      </section>
-    </>
+        </section>
+      </div>
+    </details>
   );
 }
 

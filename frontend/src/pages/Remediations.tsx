@@ -1,6 +1,21 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import "../styles/remediations.css";
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { useLocation } from "react-router-dom";
+
+import Icon from "../components/Icon";
+
+import {
+  EmptyState,
+  ErrorState,
+  SkeletonCard,
+} from "../components/StateBlock";
 
 import {
   CloudGuardAPIError,
@@ -167,95 +182,96 @@ function Remediations() {
   }
 
 
+  const pageHeader = (
+    <header className="topbar">
+      <div>
+        <p className="eyebrow">
+          Remediation
+        </p>
+
+        <h2>
+          What Should I Fix First?
+        </h2>
+
+        <p className="page-subtitle">
+          Recommendations ranked by simulated
+          impact on attack paths and
+          CloudGuard risk. Simulation is
+          read-only and never modifies cloud
+          resources.
+        </p>
+      </div>
+
+      {!loading && !error && (
+        <span className="badge badge-neutral badge-lg no-dot">
+          {remediations.length} remediation
+          {remediations.length === 1
+            ? ""
+            : "s"}
+        </span>
+      )}
+    </header>
+  );
+
+
   if (loading) {
     return (
-      <section className="page-state">
-        Evaluating remediations against the
-        current security state...
-      </section>
+      <div className="page">
+        {pageHeader}
+
+        <div
+          className="rem-list"
+          aria-busy="true"
+          aria-label="Loading remediations"
+        >
+          <SkeletonCard lines={4} />
+          <SkeletonCard lines={4} />
+          <SkeletonCard lines={4} />
+        </div>
+      </div>
     );
   }
 
 
   if (error) {
     return (
-      <section className="page-state error-message">
-        <div>
-          <h2>
-            CloudGuard API unavailable
-          </h2>
+      <div className="page">
+        {pageHeader}
 
-          <p>
-            Remediation analysis could not be
-            loaded. Make sure the API service is
-            running, then try again.
-          </p>
-
-          {error.status && (
-            <p>
-              HTTP status: {error.status}
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              void loadRemediations();
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      </section>
+        <ErrorState
+          error={error}
+          resourceLabel="remediation analysis"
+          onRetry={() => {
+            void loadRemediations();
+          }}
+        />
+      </div>
     );
   }
 
 
   return (
-    <>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">
-            REMEDIATION
-          </p>
-
-          <h2>
-            What Should I Fix First?
-          </h2>
-
-          <p className="subtitle">
-            Recommendations ranked by simulated
-            impact on attack paths and
-            CloudGuard risk. Simulation is
-            read-only and never modifies cloud
-            resources.
-          </p>
-        </div>
-
-        <div className="environment-badge">
-          {remediations.length} REMEDIATION
-          {remediations.length === 1
-            ? ""
-            : "S"}
-        </div>
-      </header>
+    <div className="page">
+      {pageHeader}
 
       {remediations.length === 0 ? (
-        <section className="panel">
-          <p className="details-text">
-            No supported remediation conditions
-            were detected in the current
-            analysis.
-          </p>
-        </section>
+        <EmptyState
+          icon="remediate"
+          title="No remediations identified"
+          body="The current analysis did not surface any supported remediation actions for this scan."
+        />
       ) : (
-        <section className="remediation-list">
+        <section
+          className="rem-list"
+          aria-label="Prioritized remediations"
+        >
           {remediations.map(
-            (remediation) => (
+            (remediation, index) => (
               <RemediationCard
                 key={
                   remediation.remediation_id
                 }
+                rank={index + 1}
                 remediation={remediation}
                 simulation={
                   simulations[
@@ -286,12 +302,13 @@ function Remediations() {
           )}
         </section>
       )}
-    </>
+    </div>
   );
 }
 
 
 type RemediationCardProps = {
+  rank: number;
   remediation: Remediation;
   simulation: SimulationResult | undefined;
   simulating: boolean;
@@ -301,45 +318,89 @@ type RemediationCardProps = {
 
 
 function RemediationCard({
+  rank,
   remediation,
   simulation,
   simulating,
   simulationError,
   onSimulate,
 }: RemediationCardProps) {
+  const findingCount =
+    remediation.finding_ids.length;
+
+  const riskDelta =
+    remediation.risk_reduction;
+
   return (
-    <article className="panel remediation-card">
-      <div className="remediation-header">
-        <span className="remediation-rank">
-          #{remediation.priority ?? "—"}
+    <article className="panel rem-card">
+      <div className="rem-card-head">
+        <span
+          className="rem-rank"
+          aria-label={`Rank ${rank}`}
+        >
+          {rank}
         </span>
 
-        <div className="remediation-heading">
-          <h3>{remediation.title}</h3>
+        <div className="rem-head-main">
+          <div className="rem-badges">
+            <span
+              className={`badge no-dot ${priorityBadgeClass(
+                remediation.priority,
+              )}`}
+              title="Remediation priority"
+            >
+              {priorityLabel(
+                remediation.priority,
+              )}
+            </span>
 
-          <span className="remediation-action">
-            {formatActionType(
-              remediation.action_type,
-            )}
-          </span>
+            <span className="badge badge-neutral no-dot">
+              {formatActionType(
+                remediation.action_type,
+              )}
+            </span>
+          </div>
+
+          <h3 className="rem-title">
+            {remediation.title}
+          </h3>
+
+          <p className="rem-desc">
+            {remediation.description}
+          </p>
+        </div>
+
+        <div className="rem-delta">
+          {riskDelta !== null ? (
+            <>
+              <span
+                className="badge badge-success badge-lg no-dot"
+                title="Simulated risk reduction — no changes were made"
+              >
+                &minus;{riskDelta} risk
+              </span>
+
+              {remediation.risk_reduction_percent
+                !== null && (
+                <span className="rem-delta-note">
+                  &minus;
+                  {Math.round(
+                    remediation
+                      .risk_reduction_percent,
+                  )}
+                  % projected
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="badge badge-neutral badge-lg no-dot">
+              Risk delta &mdash;
+            </span>
+          )}
         </div>
       </div>
 
-      <p className="details-text">
-        {remediation.description}
-      </p>
-
-      <div className="finding-assets">
-        {remediation.affected_resources.map(
-          (resource) => (
-            <span key={resource}>
-              {resource}
-            </span>
-          ),
-        )}
-      </div>
-
-      <div className="remediation-metrics">
+      <div className="rem-stats">
         <RemediationMetric
           label="Attack paths affected"
           value={String(
@@ -348,10 +409,8 @@ function RemediationCard({
         />
 
         <RemediationMetric
-          label="Paths removed"
-          value={formatNullable(
-            remediation.paths_removed,
-          )}
+          label="Findings addressed"
+          value={String(findingCount)}
         />
 
         <RemediationMetric
@@ -362,56 +421,125 @@ function RemediationCard({
         />
 
         <RemediationMetric
-          label="Risk after"
+          label="Risk after (projected)"
           value={formatNullable(
             remediation.risk_after,
           )}
         />
-
-        <RemediationMetric
-          label="Risk reduction"
-          value={formatNullable(
-            remediation.risk_reduction,
-          )}
-        />
       </div>
 
-      <div className="details-divider" />
+      {remediation.affected_resources.length
+        > 0 && (
+        <div className="rem-resources">
+          <span className="rem-label">
+            Affected resources
+          </span>
 
-      <p className="details-section-title">
-        Evidence
-      </p>
-
-      <ul className="remediation-evidence">
-        {remediation.evidence.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-
-      <p className="details-section-title">
-        Expected effect
-      </p>
-
-      <p className="details-text">
-        {remediation.expected_effect}
-      </p>
-
-      <button
-        type="button"
-        className="simulate-button"
-        disabled={simulating}
-        onClick={onSimulate}
-      >
-        {simulating
-          ? "SIMULATING..."
-          : "SIMULATE FIX"}
-      </button>
-
-      {simulationError && (
-        <p className="simulation-error">
-          {simulationError}
-        </p>
+          <div className="chip-row">
+            {remediation.affected_resources.map(
+              (resource) => (
+                <span
+                  className="chip"
+                  key={resource}
+                >
+                  <span className="mono">
+                    {resource}
+                  </span>
+                </span>
+              ),
+            )}
+          </div>
+        </div>
       )}
+
+      <details className="rem-details">
+        <summary className="rem-details-summary">
+          <Icon
+            name="chevron-right"
+            size={14}
+            className="rem-details-chev"
+          />
+          Evidence, expected effect &amp;
+          manual steps
+        </summary>
+
+        <div className="rem-details-body">
+          <p className="rem-label">
+            Evidence
+          </p>
+
+          <ul className="rem-evidence">
+            {remediation.evidence.map(
+              (item) => (
+                <li key={item}>{item}</li>
+              ),
+            )}
+          </ul>
+
+          <p className="rem-label">
+            Expected effect
+          </p>
+
+          <p className="rem-text">
+            {remediation.expected_effect}
+          </p>
+
+          {remediation.manual_steps.length
+            > 0 && (
+            <>
+              <p className="rem-label">
+                Manual steps
+              </p>
+
+              <ol className="rem-steps">
+                {remediation.manual_steps.map(
+                  (step) => (
+                    <li key={step}>
+                      {step}
+                    </li>
+                  ),
+                )}
+              </ol>
+            </>
+          )}
+        </div>
+      </details>
+
+      <div className="rem-actions">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={simulating}
+          onClick={onSimulate}
+        >
+          {simulating ? (
+            <>
+              <span
+                className="btn-spinner"
+                aria-hidden="true"
+              />
+              Simulating&hellip;
+            </>
+          ) : (
+            <>
+              <Icon name="play" size={14} />
+              {simulation
+                ? "Re-run Simulation"
+                : "Simulate Fix"}
+            </>
+          )}
+        </button>
+
+        {simulationError && (
+          <p
+            className="rem-sim-error"
+            role="alert"
+          >
+            <Icon name="alert" size={14} />
+            {simulationError}
+          </p>
+        )}
+      </div>
 
       {simulation && (
         <SimulationPanel
@@ -431,7 +559,7 @@ function RemediationMetric({
   value: string;
 }) {
   return (
-    <div className="remediation-metric">
+    <div className="rem-stat">
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -444,94 +572,119 @@ function SimulationPanel({
 }: {
   simulation: SimulationResult;
 }) {
-  return (
-    <div className="simulation-panel">
-      <div className="simulation-header">
-        <span className="simulation-badge">
-          SIMULATION ONLY
-        </span>
+  const { before, after, impact } =
+    simulation;
 
-        <p className="simulation-note">
-          {simulation.note}
-        </p>
+  return (
+    <section
+      className="sim-panel"
+      aria-label="Simulated result — no changes were made to AWS"
+    >
+      <div
+        className="sim-disclaimer"
+        role="note"
+      >
+        <Icon name="info" size={14} />
+        <span>
+          <strong>SIMULATED</strong>
+          {" — no changes were made to AWS. "}
+          This is a read-only preview.
+        </span>
       </div>
 
-      <div className="simulation-grid">
-        <div className="simulation-column">
-          <p className="eyebrow">BEFORE</p>
+      <div className="sim-flow">
+        <SimStateCard
+          label="Before"
+          highestRisk={before.highest_risk}
+          attackPaths={before.attack_paths}
+          findings={before.findings}
+        />
 
-          <SimulationRow
-            label="Highest risk"
-            value={
-              simulation.before.highest_risk
-            }
-          />
+        <div className="sim-connector">
+          <span
+            className="sim-connector-arrow"
+            aria-hidden="true"
+          >
+            <Icon
+              name="chevron-right"
+              size={16}
+            />
+          </span>
 
-          <SimulationRow
-            label="Attack paths"
-            value={
-              simulation.before.attack_paths
-            }
-          />
+          <span className="sim-connector-chip">
+            &minus;{impact.risk_reduction}{" "}
+            risk (
+            {Math.round(
+              impact.risk_reduction_percent,
+            )}
+            %)
+          </span>
 
-          <SimulationRow
-            label="Findings"
-            value={
-              simulation.before.findings
-            }
-          />
+          <span className="sim-connector-sub">
+            &minus;{impact.paths_removed}{" "}
+            attack path
+            {impact.paths_removed === 1
+              ? ""
+              : "s"}
+          </span>
         </div>
 
-        <div className="simulation-column">
-          <p className="eyebrow">AFTER</p>
+        <SimStateCard
+          label="After (simulated)"
+          highestRisk={after.highest_risk}
+          attackPaths={after.attack_paths}
+          findings={after.findings}
+          after
+        />
+      </div>
 
-          <SimulationRow
-            label="Highest risk"
-            value={
-              simulation.after.highest_risk
-            }
-          />
+      <p className="sim-note">
+        {simulation.note}
+      </p>
+    </section>
+  );
+}
 
-          <SimulationRow
-            label="Attack paths"
-            value={
-              simulation.after.attack_paths
-            }
-          />
 
-          <SimulationRow
-            label="Findings"
-            value={
-              simulation.after.findings
-            }
-          />
+function SimStateCard({
+  label,
+  highestRisk,
+  attackPaths,
+  findings,
+  after = false,
+}: {
+  label: string;
+  highestRisk: number;
+  attackPaths: number;
+  findings: number;
+  after?: boolean;
+}) {
+  return (
+    <div
+      className={
+        after
+          ? "sim-state sim-state-after"
+          : "sim-state"
+      }
+    >
+      <p className="sim-state-label">
+        {label}
+      </p>
+
+      <div className="sim-state-metrics">
+        <div className="sim-metric">
+          <span>Highest risk</span>
+          <strong>{highestRisk}</strong>
         </div>
 
-        <div className="simulation-column">
-          <p className="eyebrow">IMPACT</p>
+        <div className="sim-metric">
+          <span>Attack paths</span>
+          <strong>{attackPaths}</strong>
+        </div>
 
-          <SimulationRow
-            label="Paths removed"
-            value={
-              simulation.impact.paths_removed
-            }
-          />
-
-          <SimulationRow
-            label="Risk reduction"
-            value={
-              simulation.impact
-                .risk_reduction
-            }
-          />
-
-          <SimulationRow
-            label="Reduction %"
-            value={
-              simulation.impact
-                .risk_reduction_percent
-            }
-          />
+        <div className="sim-metric">
+          <span>Findings</span>
+          <strong>{findings}</strong>
         </div>
       </div>
     </div>
@@ -539,19 +692,28 @@ function SimulationPanel({
 }
 
 
-function SimulationRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="simulation-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+function priorityLabel(
+  priority: number | null,
+) {
+  return priority === null
+    ? "Unranked"
+    : `P${priority}`;
+}
+
+
+function priorityBadgeClass(
+  priority: number | null,
+) {
+  switch (priority) {
+    case 1:
+      return "badge-critical";
+    case 2:
+      return "badge-high";
+    case 3:
+      return "badge-medium";
+    default:
+      return "badge-neutral";
+  }
 }
 
 

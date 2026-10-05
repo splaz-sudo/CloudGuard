@@ -1,0 +1,399 @@
+/* ============================================
+   Network Exposure page
+   Tokens and global classes live in
+   index.css / App.css — page-specific only here.
+   ============================================ */
+
+/* --- Summary stat accents --- */
+
+.net-value-danger {
+  color: var(--danger);
+}
+
+/* --- Master / detail layout --- */
+
+.network-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+
+.network-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: var(--s-3);
+  list-style: none;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.network-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-3);
+  text-align: left;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.network-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.network-item.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+
+/* Subtle danger edge on internet-exposed workloads */
+.network-item.is-public {
+  border-left: 3px solid var(--danger);
+}
+
+.network-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.network-item-name {
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.network-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.network-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.network-meta .icon {
+  flex-shrink: 0;
+}
+
+.network-meta.net-meta-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.network-item-score {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* --- Detail panel --- */
+
+.network-detail-panel {
+  min-width: 0;
+}
+
+.network-detail-name {
+  font-size: var(--fs-section);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.network-score {
+  min-width: 170px;
+  flex-shrink: 0;
+}
+
+.network-score-label {
+  display: block;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--s-2);
+}
+
+.network-section + .network-section {
+  margin-top: var(--s-5);
+}
+
+.network-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-card-title);
+  font-weight: 650;
+  color: var(--text-primary);
+  margin-bottom: var(--s-3);
+}
+
+.network-section-title .icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.network-section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--s-4);
+}
+
+/* --- Inbound rules table --- */
+
+.net-chips {
+  gap: var(--s-1);
+}
+
+.net-chip-danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.net-sg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.net-sg .mono {
+  font-size: var(--fs-meta);
+}
+
+/* --- Risk factor rows --- */
+
+.net-factors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.net-factor {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.net-factor .icon {
+  color: var(--warning);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* --- Mini resource cards --- */
+
+.net-mini-card {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  min-width: 0;
+}
+
+.net-mini-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+
+.net-mini-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.net-mini-icon.danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.net-mini-icon.warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: var(--warning);
+}
+
+.net-mini-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* --- Scannable mono rows --- */
+
+.net-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.net-row {
+  padding: 5px var(--s-2);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.net-row:last-child {
+  border-bottom: none;
+}
+
+/* --- Expandable disclosure blocks --- */
+
+.net-disclosure {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+
+.net-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.net-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.net-disclosure > summary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.net-disclosure > summary .icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.net-disclosure[open] > summary .icon {
+  transform: rotate(90deg);
+}
+
+.net-disclosure-body {
+  border-top: 1px solid var(--border-subtle);
+  padding: var(--s-2) var(--s-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* --- Attack path chains --- */
+
+.net-paths {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.net-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+
+.net-path-node {
+  padding: 2px var(--s-2);
+  border-radius: var(--r-xs);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--fs-meta);
+  max-width: 100%;
+}
+
+.net-path-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* --- Disclaimer footnote --- */
+
+.network-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-secondary);
+  color: var(--text-muted);
+}
+
+.network-disclaimer .icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1024px) {
+  .network-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .network-list {
+    max-height: 320px;
+  }
+}

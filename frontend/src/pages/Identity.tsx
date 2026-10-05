@@ -1,7 +1,8 @@
 import {
-  useEffect,
+  Fragment,
   useMemo,
   useState,
+  type CSSProperties,
 } from "react";
 
 import {
@@ -12,88 +13,80 @@ import {
   useScanContext,
 } from "../context/ScanContext";
 
+import {
+  useScanQuery,
+} from "../hooks/useApiQuery";
+
+import Icon, { type IconName } from "../components/Icon";
+
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from "../components/StateBlock";
+
 import type {
   IdentityRisk,
 } from "../types/cloudguard";
 
+import "../styles/identity.css";
+
+
+const PREVIEW_ROWS = 4;
+const PREVIEW_CHIPS = 8;
+
 
 function Identity() {
-  const { selectedScan } =
-    useScanContext();
+  const {
+    selectedScan,
+    loading: scansLoading,
+  } = useScanContext();
 
   const scanId =
     selectedScan?.scan_id ?? null;
 
-  const [identities, setIdentities] =
-    useState<IdentityRisk[]>([]);
-
-  const [
-    selectedIdentity,
-    setSelectedIdentity,
-  ] = useState<IdentityRisk | null>(
-    null,
+  const query = useScanQuery(
+    getScanIdentityRisks,
+    scanId,
+    { enabled: Boolean(scanId) },
   );
 
-  const [loading, setLoading] =
-    useState(true);
+  const identities = useMemo(
+    () => query.data ?? [],
+    [query.data],
+  );
 
-  const [error, setError] =
+  const [selectedId, setSelectedId] =
     useState<string | null>(null);
 
-
-  useEffect(() => {
-    if (!scanId) {
-      return;
-    }
-
-    const currentScanId: string = scanId;
-
-    async function loadIdentityRisks() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data =
-          await getScanIdentityRisks(
-            currentScanId,
-          );
-
-        setIdentities(data);
-
-        if (data.length > 0) {
-          setSelectedIdentity(data[0]);
-        } else {
-          setSelectedIdentity(null);
-        }
-      } catch (requestError) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : (
-              "Unable to load identity " +
-              "risk analysis."
-            ),
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadIdentityRisks();
-  }, [scanId]);
+  // Derived selection: keep the user's choice
+  // while it exists in the current data, and
+  // fall back to the highest-priority (first)
+  // identity when data arrives or the scan
+  // changes.
+  const selectedIdentity =
+    identities.find(
+      (identity) =>
+        identity.identity_id === selectedId,
+    ) ?? identities[0] ?? null;
 
 
   const metrics = useMemo(() => {
-    const critical = identities.filter(
-      (identity) =>
-        identity.severity.toLowerCase() ===
-        "critical",
+    const highPrivilege = identities.filter(
+      (identity) => {
+        const severity =
+          identity.severity.toLowerCase();
+
+        return (
+          severity === "critical"
+          || severity === "high"
+        );
+      },
     ).length;
 
-    const high = identities.filter(
+    const sensitiveReach = identities.filter(
       (identity) =>
-        identity.severity.toLowerCase() ===
-        "high",
+        identity.sensitive_resources.length > 0,
     ).length;
 
     const exposed = identities.filter(
@@ -101,52 +94,192 @@ function Identity() {
         identity.exposed_workloads.length > 0,
     ).length;
 
-    const sensitive = identities.filter(
-      (identity) =>
-        identity.sensitive_resources.length >
-        0,
-    ).length;
-
     return {
-      critical,
-      high,
+      highPrivilege,
+      sensitiveReach,
       exposed,
-      sensitive,
     };
   }, [identities]);
 
 
-  if (loading) {
-    return (
-      <section className="page-state">
-        Analyzing IAM identities...
-      </section>
+  let content: React.ReactNode;
+
+  if (!scanId) {
+    content = scansLoading ? (
+      <LoadingState label="Loading scan context…" />
+    ) : (
+      <EmptyState
+        icon="scans"
+        title="No scan selected"
+        body={
+          "Select or start a scan from the "
+          + "sidebar to review identity analysis."
+        }
+      />
     );
-  }
+  } else if (query.loading) {
+    content = (
+      <LoadingState label="Analyzing IAM identities…" />
+    );
+  } else if (query.error) {
+    content = (
+      <ErrorState
+        error={query.error}
+        resourceLabel="identity analysis"
+        onRetry={query.retry}
+      />
+    );
+  } else if (identities.length === 0) {
+    content = (
+      <EmptyState
+        icon="identity"
+        title="No IAM identities discovered"
+        body={
+          "The selected scan did not observe "
+          + "any IAM users, roles, or instance "
+          + "profiles to assess."
+        }
+      />
+    );
+  } else {
+    content = (
+      <>
+        <section
+          className="stat-grid"
+          style={{ "--i": 1 } as CSSProperties}
+          aria-label="Identity risk summary"
+        >
+          <div className="stat">
+            <span className="stat-label">
+              <Icon name="identity" size={13} />
+              Identities assessed
+            </span>
+
+            <span className="stat-value">
+              {identities.length}
+            </span>
+          </div>
+
+          <div className="stat">
+            <span className="stat-label">
+              <Icon name="shield" size={13} />
+              High privilege
+            </span>
+
+            <span className="stat-value id-value-danger">
+              {metrics.highPrivilege}
+            </span>
+
+            <span className="stat-foot">
+              Critical or high privilege-risk
+            </span>
+          </div>
+
+          <div className="stat">
+            <span className="stat-label">
+              <Icon name="lock" size={13} />
+              Reach sensitive
+            </span>
+
+            <span className="stat-value id-value-warning">
+              {metrics.sensitiveReach}
+            </span>
+
+            <span className="stat-foot">
+              Can reach sensitive resources
+            </span>
+          </div>
+
+          <div className="stat">
+            <span className="stat-label">
+              <Icon name="globe" size={13} />
+              Exposed workloads
+            </span>
+
+            <span className="stat-value">
+              {metrics.exposed}
+            </span>
+
+            <span className="stat-foot">
+              Linked to exposed workloads
+            </span>
+          </div>
+        </section>
 
 
-  if (error) {
-    return (
-      <section className="page-state error-message">
-        {error}
-      </section>
+        <section
+          className="identity-layout"
+          style={{ "--i": 2 } as CSSProperties}
+        >
+          <div className="panel">
+            <div className="panel-header">
+              <h3 className="panel-title">
+                Risk prioritization
+              </h3>
+
+              <span className="badge badge-neutral badge-sm no-dot">
+                {identities.length}
+              </span>
+            </div>
+
+            <ul
+              className="identity-list"
+              aria-label="Identities by risk"
+            >
+              {identities.map((identity) => (
+                <li key={identity.identity_id}>
+                  <IdentityListItem
+                    identity={identity}
+                    selected={
+                      identity.identity_id
+                      === selectedIdentity?.identity_id
+                    }
+                    onSelect={() =>
+                      setSelectedId(
+                        identity.identity_id,
+                      )
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+
+
+          <div className="panel identity-detail-panel">
+            {selectedIdentity ? (
+              <IdentityDetails
+                identity={selectedIdentity}
+              />
+            ) : (
+              <EmptyState
+                icon="identity"
+                title="Select an identity"
+                body={
+                  "Choose an identity from the "
+                  + "list to inspect its privilege "
+                  + "risk."
+                }
+              />
+            )}
+          </div>
+        </section>
+      </>
     );
   }
 
 
   return (
-    <>
+    <div className="page">
       <header className="topbar">
         <div>
           <p className="eyebrow">
             IDENTITY SECURITY
           </p>
 
-          <h2>
-            Identity & IAM Risk
-          </h2>
+          <h2>Identity &amp; IAM Risk</h2>
 
-          <p className="subtitle">
+          <p className="page-subtitle">
             Contextual analysis of observed IAM
             permissions, workload exposure,
             sensitive-resource access, and
@@ -154,154 +287,102 @@ function Identity() {
           </p>
         </div>
 
-        <div className="environment-badge">
-          {identities.length} IDENTITIES
-        </div>
+        {identities.length > 0 && (
+          <span className="badge badge-info badge-lg no-dot">
+            {identities.length} identities assessed
+          </span>
+        )}
       </header>
 
-
-      <section className="identity-metrics">
-        <IdentityMetric
-          label="Critical"
-          value={metrics.critical}
-        />
-
-        <IdentityMetric
-          label="High Risk"
-          value={metrics.high}
-        />
-
-        <IdentityMetric
-          label="Exposed Workload"
-          value={metrics.exposed}
-        />
-
-        <IdentityMetric
-          label="Sensitive Access"
-          value={metrics.sensitive}
-        />
-      </section>
-
-
-      {identities.length === 0 ? (
-        <section className="panel">
-          <div className="page-state">
-            No IAM identities were discovered.
-          </div>
-        </section>
-      ) : (
-        <section className="identity-layout">
-          <div className="identity-list-panel">
-            <div className="identity-list-header">
-              <div>
-                <p className="eyebrow">
-                  IDENTITIES
-                </p>
-
-                <h3>
-                  Risk Prioritization
-                </h3>
-              </div>
-            </div>
-
-            <div className="identity-list">
-              {identities.map(
-                (identity) => (
-                  <button
-                    key={
-                      identity.identity_id
-                    }
-                    type="button"
-                    className={
-                      selectedIdentity
-                        ?.identity_id ===
-                      identity.identity_id
-                        ? (
-                          "identity-list-item " +
-                          "selected"
-                        )
-                        : "identity-list-item"
-                    }
-                    onClick={() =>
-                      setSelectedIdentity(
-                        identity,
-                      )
-                    }
-                  >
-                    <div>
-                      <strong>
-                        {
-                          identity
-                            .identity_name
-                        }
-                      </strong>
-
-                      <span>
-                        {formatIdentityType(
-                          identity
-                            .identity_type,
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="identity-score">
-                      <span
-                        className={
-                          `identity-severity ${
-                            identity.severity
-                              .toLowerCase()
-                          }`
-                        }
-                      >
-                        {
-                          identity
-                            .severity
-                            .toUpperCase()
-                        }
-                      </span>
-
-                      <strong>
-                        {
-                          identity
-                            .risk_score
-                        }
-                      </strong>
-                    </div>
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-
-
-          <div className="identity-details-panel">
-            {selectedIdentity && (
-              <IdentityDetails
-                identity={
-                  selectedIdentity
-                }
-              />
-            )}
-          </div>
-        </section>
-      )}
-    </>
+      {content}
+    </div>
   );
 }
 
 
-function IdentityMetric({
-  label,
-  value,
+function IdentityListItem({
+  identity,
+  selected,
+  onSelect,
 }: {
-  label: string;
-  value: number;
+  identity: IdentityRisk;
+  selected: boolean;
+  onSelect: () => void;
 }) {
+  const inAttackPath =
+    identity.attack_paths.length > 0;
+
   return (
-    <article className="identity-metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+    <button
+      type="button"
+      className={
+        `identity-item${selected ? " selected" : ""}`
+      }
+      aria-current={selected || undefined}
+      onClick={onSelect}
+    >
+      <span className="identity-item-top">
+        <span className="identity-item-name truncate">
+          {identity.identity_name}
+        </span>
+
+        <span
+          className={
+            "badge badge-sm "
+            + severityBadgeClass(identity.severity)
+          }
+        >
+          {identity.severity.toUpperCase()}
+        </span>
+      </span>
+
+      <span className="identity-item-meta">
+        <span
+          className={
+            "badge badge-sm no-dot "
+            + identityTypeBadgeClass(
+              identity.identity_type,
+            )
+          }
+        >
+          {formatIdentityType(identity.identity_type)}
+        </span>
+
+        <span
+          className="identity-meta"
+          title="Observed permissions"
+        >
+          <Icon name="shield" size={12} />
+          {identity.permissions.length}
+        </span>
+
+        <span
+          className="identity-meta"
+          title="Sensitive resources reachable"
+        >
+          <Icon name="lock" size={12} />
+          {identity.sensitive_resources.length}
+        </span>
+
+        <span
+          className="identity-meta"
+          title="Exposed workload relationships"
+        >
+          <Icon name="globe" size={12} />
+          {identity.exposed_workloads.length}
+        </span>
+
+        {inAttackPath && (
+          <span
+            className="identity-meta id-meta-danger"
+            title="Participates in an attack path (privilege-escalation indicator)"
+          >
+            <Icon name="paths" size={12} />
+            {identity.attack_paths.length}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -311,262 +392,418 @@ function IdentityDetails({
 }: {
   identity: IdentityRisk;
 }) {
+  const score = clampScore(identity.risk_score);
+
   return (
     <>
-      <div className="identity-detail-header">
-        <div>
+      <div className="panel-header">
+        <div className="grow">
           <p className="eyebrow">
             IDENTITY PROFILE
           </p>
 
-          <h3>
+          <h3 className="identity-detail-name">
             {identity.identity_name}
           </h3>
 
-          <p>
-            {formatIdentityType(
-              identity.identity_type,
-            )}
-          </p>
-        </div>
+          <div className="chip-row mt-2">
+            <span
+              className={
+                "badge badge-sm no-dot "
+                + identityTypeBadgeClass(
+                  identity.identity_type,
+                )
+              }
+            >
+              {formatIdentityType(
+                identity.identity_type,
+              )}
+            </span>
 
-        <div className="identity-risk-score">
-          <span>Risk Score</span>
+            <span
+              className={
+                "badge badge-sm "
+                + severityBadgeClass(
+                  identity.severity,
+                )
+              }
+            >
+              {identity.severity.toUpperCase()} RISK
+            </span>
 
-          <strong>
-            {identity.risk_score}
-          </strong>
-
-          <small
-            className={
-              `identity-severity ${
-                identity.severity
-                  .toLowerCase()
-              }`
-            }
-          >
-            {identity.severity.toUpperCase()}
-          </small>
-        </div>
-      </div>
-
-
-      <div className="identity-section">
-        <p className="details-section-title">
-          Risk Factors
-        </p>
-
-        {identity.risk_factors.length ===
-        0 ? (
-          <p className="details-text">
-            No contextual risk factors were
-            detected.
-          </p>
-        ) : (
-          <div className="risk-factor-list">
-            {identity.risk_factors.map(
-              (factor) => (
-                <div
-                  className="risk-factor"
-                  key={factor}
-                >
-                  <span>!</span>
-                  <p>{factor}</p>
-                </div>
-              ),
+            {identity.attack_paths.length > 0 && (
+              <span className="badge badge-sm badge-danger no-dot">
+                <Icon name="paths" size={11} />
+                In {identity.attack_paths.length}{" "}
+                attack path
+                {identity.attack_paths.length === 1
+                  ? ""
+                  : "s"}
+              </span>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
+        <div className="identity-score">
+          <span className="identity-score-label">
+            Risk score
+          </span>
 
-      <div className="identity-section">
-        <p className="details-section-title">
-          Observed Permissions
-        </p>
+          <div className="riskbar-with-value">
+            <div className="riskbar">
+              <div
+                className={
+                  "riskbar-fill "
+                  + severityBarClass(identity.severity)
+                }
+                style={{ width: `${score}%` }}
+              />
+            </div>
 
-        {identity.permissions.length === 0 ? (
-          <p className="details-text">
-            No permissions were observed in
-            the current graph.
-          </p>
-        ) : (
-          <div className="permission-list">
-            {identity.permissions.map(
-              (permission) => (
-                <span
-                  className="permission-chip"
-                  key={permission}
-                >
-                  {permission}
-                </span>
-              ),
-            )}
+            <span className="riskbar-value">
+              {identity.risk_score}
+            </span>
           </div>
-        )}
+        </div>
       </div>
 
 
-      <div className="identity-section-grid">
-        <IdentityResourceList
-          title="Exposed Workloads"
-          resources={
-            identity.exposed_workloads
-          }
-          empty="No exposed workloads."
-          warning
-        />
+      <div className="panel-body">
+        <section className="identity-section">
+          <h4 className="identity-section-title">
+            <Icon name="warning" size={13} />
+            Privilege-escalation signals
+            <span className="badge badge-sm badge-neutral no-dot">
+              {identity.risk_factors.length}
+            </span>
+          </h4>
 
-        <IdentityResourceList
-          title="Sensitive Resources"
-          resources={
-            identity.sensitive_resources
-          }
-          empty="No sensitive resources."
-          danger
-        />
-      </div>
-
-
-      <div className="identity-section">
-        <p className="details-section-title">
-          Connected Assets
-        </p>
-
-        <div className="identity-resource-list">
-          {identity.connected_assets.length ===
-          0 ? (
-            <p className="details-text">
-              No connected assets.
+          {identity.risk_factors.length === 0 ? (
+            <p className="muted">
+              No contextual risk factors were
+              detected for this identity.
             </p>
           ) : (
-            identity.connected_assets.map(
-              (asset) => (
-                <div
-                  className="identity-resource"
-                  key={asset}
-                >
-                  {asset}
-                </div>
-              ),
-            )
+            <ul className="id-factors">
+              {identity.risk_factors.map(
+                (factor) => (
+                  <li
+                    className="id-factor"
+                    key={factor}
+                  >
+                    <Icon name="alert" size={13} />
+                    <span>{factor}</span>
+                  </li>
+                ),
+              )}
+            </ul>
           )}
+        </section>
+
+
+        <section className="identity-section">
+          <h4 className="identity-section-title">
+            <Icon name="shield" size={13} />
+            Observed permissions
+            <span className="badge badge-sm badge-neutral no-dot">
+              {identity.permissions.length}
+            </span>
+          </h4>
+
+          <CollapsibleRows
+            items={identity.permissions}
+            preview={PREVIEW_CHIPS}
+            asChips
+            expandLabel="Show all permissions"
+            empty="No permissions were observed in the current graph."
+          />
+        </section>
+
+
+        <div
+          className={
+            "identity-section "
+            + "identity-section-grid"
+          }
+        >
+          <IdentityResourceCard
+            icon="lock"
+            tone="danger"
+            title="Sensitive resources reachable"
+            items={identity.sensitive_resources}
+            empty="No sensitive resources reachable."
+          />
+
+          <IdentityResourceCard
+            icon="globe"
+            tone="warning"
+            title="Exposed workload links"
+            items={identity.exposed_workloads}
+            empty="No exposed workloads linked."
+          />
+
+          <IdentityResourceCard
+            icon="inventory"
+            tone="neutral"
+            title="Connected assets"
+            items={identity.connected_assets}
+            empty="No connected assets."
+          />
         </div>
-      </div>
 
 
-      <div className="identity-section">
-        <p className="details-section-title">
-          Attack Path Participation
+        <section className="identity-section">
+          <h4 className="identity-section-title">
+            <Icon name="paths" size={13} />
+            Attack path participation
+            <span className="badge badge-sm badge-neutral no-dot">
+              {identity.attack_paths.length}
+            </span>
+          </h4>
+
+          {identity.attack_paths.length === 0 ? (
+            <p className="muted">
+              This identity does not participate
+              in a discovered attack path.
+            </p>
+          ) : (
+            <div className="id-paths">
+              {identity.attack_paths.map(
+                (path, pathIndex) => (
+                  <div
+                    className="id-path"
+                    key={pathIndex}
+                  >
+                    {path.map(
+                      (node, nodeIndex) => (
+                        <Fragment
+                          key={`${node}-${nodeIndex}`}
+                        >
+                          {nodeIndex > 0 && (
+                            <Icon
+                              name="chevron-right"
+                              size={12}
+                              className="id-path-arrow"
+                            />
+                          )}
+
+                          <span className="id-path-node mono wrap-anywhere">
+                            {node}
+                          </span>
+                        </Fragment>
+                      ),
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </section>
+
+
+        <p className="identity-disclaimer">
+          <Icon name="info" size={13} />
+          <span>
+            CloudGuard reports observed
+            permissions and graph-derived access.
+            This is not a complete calculation of
+            AWS effective IAM permissions.
+          </span>
         </p>
-
-        {identity.attack_paths.length ===
-        0 ? (
-          <p className="details-text">
-            This identity does not participate
-            in a discovered attack path.
-          </p>
-        ) : (
-          <div className="identity-paths">
-            {identity.attack_paths.map(
-              (path, pathIndex) => (
-                <div
-                  className="identity-path"
-                  key={pathIndex}
-                >
-                  {path.map(
-                    (node, nodeIndex) => (
-                      <div
-                        key={
-                          `${node}-${nodeIndex}`
-                        }
-                      >
-                        <span>
-                          {node}
-                        </span>
-
-                        {nodeIndex <
-                          path.length - 1 && (
-                          <b>→</b>
-                        )}
-                      </div>
-                    ),
-                  )}
-                </div>
-              ),
-            )}
-          </div>
-        )}
-      </div>
-
-
-      <div className="identity-disclaimer">
-        CloudGuard currently reports observed
-        permissions and graph-derived access.
-        This is not a complete calculation of
-        AWS effective IAM permissions.
       </div>
     </>
   );
 }
 
 
-function IdentityResourceList({
+function IdentityResourceCard({
+  icon,
+  tone,
   title,
-  resources,
+  items,
   empty,
-  warning = false,
-  danger = false,
 }: {
+  icon: IconName;
+  tone: "danger" | "warning" | "neutral";
   title: string;
-  resources: string[];
+  items: string[];
   empty: string;
-  warning?: boolean;
-  danger?: boolean;
 }) {
   return (
-    <div className="identity-resource-card">
-      <p className="details-section-title">
-        {title}
-      </p>
+    <div className="id-mini-card">
+      <div className="id-mini-head">
+        <span
+          className={
+            `id-mini-icon${
+              tone === "neutral" ? "" : ` ${tone}`
+            }`
+          }
+        >
+          <Icon name={icon} size={13} />
+        </span>
 
-      {resources.length === 0 ? (
-        <p className="details-text">
-          {empty}
-        </p>
-      ) : (
-        <div className="identity-resource-list">
-          {resources.map(
-            (resource) => (
-              <div
-                key={resource}
-                className={[
-                  "identity-resource",
-                  warning
-                    ? "warning"
-                    : "",
-                  danger
-                    ? "danger"
-                    : "",
-                ].join(" ")}
-              >
-                {resource}
-              </div>
-            ),
-          )}
-        </div>
-      )}
+        <span className="id-mini-title">
+          {title}
+        </span>
+
+        <span className="badge badge-sm badge-neutral no-dot">
+          {items.length}
+        </span>
+      </div>
+
+      <CollapsibleRows
+        items={items}
+        preview={PREVIEW_ROWS}
+        expandLabel="Show all"
+        empty={empty}
+      />
     </div>
   );
 }
 
 
-function formatIdentityType(
-  value: string,
-) {
+/**
+ * Scannable mono rows for long technical values
+ * (ARNs, policy actions, asset IDs). Long lists
+ * show a short preview; the remainder lives in an
+ * expandable section so the page never becomes a
+ * wall of policy text.
+ */
+function CollapsibleRows({
+  items,
+  preview,
+  expandLabel,
+  empty,
+  asChips = false,
+}: {
+  items: string[];
+  preview: number;
+  expandLabel: string;
+  empty: string;
+  asChips?: boolean;
+}) {
+  if (items.length === 0) {
+    return <p className="muted">{empty}</p>;
+  }
+
+  const visible = items.slice(0, preview);
+  const hidden = items.slice(preview);
+
+  return (
+    <>
+      {asChips ? (
+        <div className="chip-row">
+          {visible.map((item) => (
+            <span className="chip" key={item}>
+              <span className="mono wrap-anywhere">
+                {item}
+              </span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="id-rows">
+          {visible.map((item) => (
+            <div
+              className="id-row mono"
+              key={item}
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hidden.length > 0 && (
+        <details className="id-disclosure mt-2">
+          <summary>
+            <Icon name="chevron-right" size={13} />
+            {expandLabel} ({hidden.length} more)
+          </summary>
+
+          <div className="id-disclosure-body">
+            <div className="id-rows">
+              {hidden.map((item) => (
+                <div
+                  className="id-row mono"
+                  key={item}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
+
+
+function formatIdentityType(value: string) {
   return value
     .replaceAll("_", " ")
     .toUpperCase();
+}
+
+
+function identityTypeBadgeClass(
+  value: string,
+): string {
+  switch (value.toLowerCase()) {
+    case "iam_user":
+    case "user":
+      return "badge-info";
+    case "instance_profile":
+      return "badge-warning";
+    case "iam_role":
+    case "role":
+    default:
+      return "badge-neutral";
+  }
+}
+
+
+function severityBadgeClass(
+  severity: string,
+): string {
+  switch (severity.toLowerCase()) {
+    case "critical":
+      return "badge-critical";
+    case "high":
+      return "badge-high";
+    case "medium":
+      return "badge-medium";
+    case "low":
+      return "badge-low";
+    case "info":
+      return "badge-info";
+    default:
+      return "badge-neutral";
+  }
+}
+
+
+function severityBarClass(
+  severity: string,
+): string {
+  switch (severity.toLowerCase()) {
+    case "critical":
+      return "sev-critical";
+    case "high":
+      return "sev-high";
+    case "medium":
+      return "sev-medium";
+    case "low":
+      return "sev-low";
+    default:
+      return "";
+  }
+}
+
+
+function clampScore(score: number): number {
+  return Math.max(0, Math.min(100, score));
 }
 
 

@@ -1,11 +1,31 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 
-import { useScanContext } from "../context/ScanContext";
+import Icon from "../components/Icon";
+
+import {
+  Button,
+  Select,
+} from "../components/FormControls";
+
+import {
+  EmptyState,
+  ErrorState,
+  SkeletonLine,
+} from "../components/StateBlock";
+
+import {
+  useScanContext,
+} from "../context/ScanContext";
 
 import type {
   ScanRecord,
 } from "../types/cloudguard";
+
+import "../styles/scans.css";
 
 
 const LOCAL_LAB_SCENARIOS = [
@@ -17,9 +37,54 @@ const LOCAL_LAB_SCENARIOS = [
 ];
 
 
+/* ------------------------------------------
+   Helpers
+   ------------------------------------------ */
+
+function riskFillClass(score: number): string {
+  if (score >= 75) return "sev-critical";
+  if (score >= 50) return "sev-high";
+  if (score >= 25) return "sev-medium";
+  return "sev-success";
+}
+
+function formatTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function relativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return "just now";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+
+/* ------------------------------------------
+   Page
+   ------------------------------------------ */
+
 function Scans() {
   const {
     scans,
+    selectedScan,
     loading,
     error,
     refreshScans,
@@ -27,254 +92,258 @@ function Scans() {
     startLocalLabScan,
   } = useScanContext();
 
-  const navigate = useNavigate();
-
-  const [scenario, setScenario] =
-    useState("public-ec2");
-
-  const [starting, setStarting] =
-    useState(false);
-
+  const [scenario, setScenario] = useState(LOCAL_LAB_SCENARIOS[0]);
+  const [starting, setStarting] = useState(false);
 
   async function runScan() {
     setStarting(true);
-
     await startLocalLabScan(scenario);
-
     setStarting(false);
   }
 
-
-  function openScan(scanId: string) {
-    selectScan(scanId);
-    navigate("/");
-  }
-
-
-  if (loading) {
-    return (
-      <section className="page-state">
-        Loading scan history...
-      </section>
-    );
-  }
-
-
-  if (error) {
-    return (
-      <section className="page-state error-message">
-        <div>
-          <h2>
-            CloudGuard API unavailable
-          </h2>
-
-          <p>
-            Scan history could not be loaded.
-          </p>
-
-          <button
-            type="button"
-            onClick={() => {
-              void refreshScans();
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      </section>
-    );
-  }
-
+  const handleRun = () => {
+    void runScan();
+  };
 
   return (
-    <>
+    <div className="page">
       <header className="topbar">
         <div>
-          <p className="eyebrow">
-            SCAN HISTORY
-          </p>
-
+          <p className="eyebrow">SCAN HISTORY</p>
           <h2>Security Scans</h2>
-
-          <p className="subtitle">
-            Immutable point-in-time security
-            snapshots. Scans are never
-            overwritten; a changed environment
-            produces a new scan.
+          <p className="page-subtitle">
+            Immutable point-in-time security snapshots. Scans are
+            never overwritten; a changed environment produces a
+            new scan.
           </p>
         </div>
 
-        <div className="environment-badge">
-          {scans.length} SCANS
+        <div className="scan-run">
+          <Select
+            label="Local lab scenario"
+            aria-label="Local lab scenario"
+            options={LOCAL_LAB_SCENARIOS.map((name) => ({
+              value: name,
+              label: name,
+            }))}
+            value={scenario}
+            onChange={setScenario}
+          />
+
+          <RunScanButton starting={starting} onRun={handleRun} />
         </div>
       </header>
 
-      <section className="panel scan-run-panel">
-        <div className="scan-run-controls">
-          <label htmlFor="scenario-select">
-            LOCAL LAB SCENARIO
-          </label>
-
-          <select
-            id="scenario-select"
-            value={scenario}
-            onChange={(event) => {
-              setScenario(
-                event.target.value,
-              );
-            }}
-          >
-            {LOCAL_LAB_SCENARIOS.map(
-              (name) => (
-                <option
-                  key={name}
-                  value={name}
-                >
-                  {name}
-                </option>
-              ),
-            )}
-          </select>
-
-          <button
-            type="button"
-            className="simulate-button"
-            disabled={starting}
-            onClick={() => {
-              void runScan();
-            }}
-          >
-            {starting
-              ? "SCANNING..."
-              : "RUN SCAN"}
-          </button>
-        </div>
-      </section>
-
-      <section className="panel">
-        {scans.length === 0 ? (
-          <p className="details-text">
-            No scans have been recorded yet.
-          </p>
-        ) : (
-          <div className="scan-table-wrapper">
-            <table className="scan-table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Source</th>
-                  <th>Environment</th>
-                  <th>Status</th>
-                  <th>Highest Risk</th>
-                  <th>Assets</th>
-                  <th>Findings</th>
-                  <th>Paths</th>
-                  <th>Scan ID</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {scans.map((record) => (
-                  <ScanRow
-                    key={record.scan_id}
-                    record={record}
-                    onOpen={() => {
-                      openScan(
-                        record.scan_id,
-                      );
-                    }}
-                  />
-                ))}
-              </tbody>
-            </table>
+      {loading ? (
+        <ScansSkeleton />
+      ) : error ? (
+        <ErrorState
+          error={error}
+          resourceLabel="scan history"
+          onRetry={() => {
+            void refreshScans();
+          }}
+        />
+      ) : scans.length === 0 ? (
+        <EmptyState
+          icon="scans"
+          title="No scans recorded yet"
+          body="Run a local lab scan to generate your first security snapshot, then select it to explore the findings."
+          action={
+            <RunScanButton starting={starting} onRun={handleRun} />
+          }
+        />
+      ) : (
+        <section style={{ "--i": 1 } as CSSProperties}>
+          <div className="scans-table-head">
+            <h3 className="section-title">Recorded scans</h3>
+            <span className="badge badge-neutral no-dot">
+              {scans.length} scan{scans.length === 1 ? "" : "s"}
+            </span>
           </div>
-        )}
-      </section>
-    </>
+
+          <div className="table-wrap">
+            <div className="table-scroll">
+              <table className="data-table scans-table">
+                <thead>
+                  <tr>
+                    <th>Environment</th>
+                    <th>Scanned</th>
+                    <th>Status</th>
+                    <th>Highest risk</th>
+                    <th className="num">Assets</th>
+                    <th className="num">Findings</th>
+                    <th className="num">Paths</th>
+                    <th>Scan ID</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {scans.map((record) => (
+                    <ScanRow
+                      key={record.scan_id}
+                      record={record}
+                      selected={
+                        selectedScan?.scan_id === record.scan_id
+                      }
+                      onSelect={() => selectScan(record.scan_id)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+
+/* ------------------------------------------
+   Row + controls
+   ------------------------------------------ */
+
+function RunScanButton({
+  starting,
+  onRun,
+}: {
+  starting: boolean;
+  onRun: () => void;
+}) {
+  return (
+    <Button
+      variant="primary"
+      loading={starting}
+      onClick={onRun}
+    >
+      {!starting && <Icon name="play" size={14} />}
+      {starting ? "Scanning…" : "Run Scan"}
+    </Button>
   );
 }
 
 
 function ScanRow({
   record,
-  onOpen,
+  selected,
+  onSelect,
 }: {
   record: ScanRecord;
-  onOpen: () => void;
+  selected: boolean;
+  onSelect: () => void;
 }) {
+  const { getSourceLabel, getStatusLabel } = useScanContext();
+
   const clickable =
     record.status === "completed"
     || record.status === "partial";
 
+  const status = getStatusLabel(record.status);
+  const statusBadge =
+    status.variant === "error" ? "danger" : status.variant;
+
+  const risk = Math.max(0, Math.min(100, record.highest_risk));
+  const ago = relativeTime(record.created_at);
+
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLTableRowElement>,
+  ) {
+    if (!clickable) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect();
+    }
+  }
+
+  const rowClass = [
+    clickable ? "clickable" : "",
+    selected ? "row-selected" : "",
+  ].filter(Boolean).join(" ");
+
   return (
     <tr
-      className={
-        clickable
-          ? "scan-row clickable"
-          : "scan-row"
+      className={rowClass || undefined}
+      onClick={clickable ? onSelect : undefined}
+      onKeyDown={handleKeyDown}
+      tabIndex={clickable ? 0 : undefined}
+      role={clickable ? "button" : undefined}
+      aria-pressed={clickable ? selected : undefined}
+      aria-label={
+        clickable ? `Select scan ${record.scan_id}` : undefined
       }
-      onClick={() => {
-        if (clickable) {
-          onOpen();
-        }
-      }}
       title={
         clickable
-          ? "Open this scan"
-          : record.error_message
-            ?? "Scan did not complete"
+          ? "Select this scan"
+          : record.error_message ?? "Scan did not complete"
       }
     >
       <td>
-        {record.created_at
-          .replace("T", " ")
-          .slice(0, 16)}
+        <div className="scan-env">
+          <span className="scan-env-name">{record.environment}</span>
+          <span className={`scan-source-badge ${record.source}`}>
+            {getSourceLabel(record.source)}
+          </span>
+        </div>
       </td>
 
       <td>
-        <span
-          className={
-            `scan-source-badge ${
-              record.source
-            }`
-          }
-        >
-          {record.source === "local_lab"
-            ? "LOCAL LAB"
-            : "AWS"}
+        <span className="scan-time">
+          {formatTimestamp(record.created_at)}
         </span>
+        {ago && <span className="scan-time-rel">{ago}</span>}
       </td>
 
-      <td>{record.environment}</td>
-
       <td>
-        <span
-          className={
-            `scan-status ${record.status}`
-          }
-        >
-          {record.status.toUpperCase()}
+        <span className={`badge badge-${statusBadge}`}>
+          {status.label}
         </span>
       </td>
 
       <td>
-        <strong>
-          {record.highest_risk}
-        </strong>
+        <div className="riskbar-with-value">
+          <div className="riskbar">
+            <div
+              className={`riskbar-fill ${riskFillClass(risk)}`}
+              style={{ width: `${risk}%` }}
+            />
+          </div>
+          <span className="riskbar-value">{record.highest_risk}</span>
+        </div>
       </td>
 
-      <td>{record.asset_count}</td>
+      <td className="cell-num">{record.asset_count}</td>
+      <td className="cell-num">{record.finding_count}</td>
+      <td className="cell-num">{record.attack_path_count}</td>
 
-      <td>{record.finding_count}</td>
-
-      <td>{record.attack_path_count}</td>
-
-      <td>
-        <code>
-          {record.scan_id.slice(0, 17)}
-        </code>
+      <td className="scan-id-cell">
+        <span
+          className="mono scan-id truncate"
+          title={record.scan_id}
+        >
+          {record.scan_id}
+        </span>
       </td>
     </tr>
+  );
+}
+
+
+function ScansSkeleton() {
+  return (
+    <div
+      className="table-wrap scans-skeleton"
+      style={{ "--i": 1 } as CSSProperties}
+      aria-hidden="true"
+    >
+      {Array.from({ length: 6 }, (_, i) => (
+        <SkeletonLine
+          key={i}
+          height={14}
+          width={i === 0 ? "40%" : "100%"}
+        />
+      ))}
+    </div>
   );
 }
 

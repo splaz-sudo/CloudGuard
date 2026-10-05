@@ -1,0 +1,63 @@
+/* ============================================
+   Inventory page — filter toolbar, summary
+   chips, and the asset data table.
+   Design tokens + shared classes come from
+   index.css / App.css.
+   ============================================ */
+
+/* --- Filter toolbar (one clean row) --- */
+
+.inventory-toolbar {
+  align-items: flex-end;
+}
+
+.inventory-search-group {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.inventory-search-group .search-input {
+  width: 100%;
+}
+
+/* --- Summary chips --- */
+
+.inventory-chips {
+  margin-bottom: var(--s-4);
+}
+
+.inventory-chips .chip .icon,
+.inventory-count .icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.inventory-chips .chip strong,
+.inventory-count strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Asset table --- */
+
+.asset-cell {
+  min-width: 240px;
+}
+
+.asset-name {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.asset-id {
+  margin-top: 2px;
+  font-size: var(--fs-secondary);
+  color: var(--text-muted);
+}
+
+/* Icons inside status badges stay aligned and
+   never shrink when the badge wraps. */
+.data-table .badge .icon {
+  flex-shrink: 0;
+}

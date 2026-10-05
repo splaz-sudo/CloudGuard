@@ -23,20 +23,140 @@ const API_BASE_URL = "";
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 
+export type ApiErrorKind =
+  | "network"      // API unreachable (connection refused, DNS, offline)
+  | "timeout"      // request aborted by the client timeout
+  | "not_found"    // 404: the requested resource does not exist
+  | "rate_limited" // 429: too many requests
+  | "server"       // 5xx: backend failed to serve the request
+  | "client"       // other 4xx: the request itself was rejected
+  | "parse"        // response was not the JSON we asked for
+  | "unknown";
+
 export class CloudGuardAPIError extends Error {
   status: number | null;
   requestId: string | null;
+  kind: ApiErrorKind;
 
   constructor(
     message: string,
     status: number | null = null,
     requestId: string | null = null,
+    kind: ApiErrorKind | null = null,
   ) {
     super(message);
 
     this.name = "CloudGuardAPIError";
     this.status = status;
     this.requestId = requestId;
+    this.kind = kind ?? classifyStatus(status);
+  }
+}
+
+
+function classifyStatus(
+  status: number | null,
+): ApiErrorKind {
+  if (status === null) return "unknown";
+  if (status === 0) return "network";
+  if (status === 404) return "not_found";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "server";
+  if (status >= 400) return "client";
+  return "unknown";
+}
+
+
+/**
+ * Statuses that may succeed on a bounded automatic
+ * retry: transient network drops, rate limiting,
+ * overloaded backend, scan-still-starting (409) and
+ * the startup race where a scan record briefly
+ * appears before its snapshot is readable (404).
+ */
+export function isTransientStatus(
+  status: number | null,
+): boolean {
+  return (
+    status === 0
+    || status === 404
+    || status === 408
+    || status === 409
+    || status === 425
+    || status === 429
+    || (status !== null && status >= 500)
+  );
+}
+
+
+/**
+ * User-facing copy for an API failure. Never claims
+ * the whole API is down when a single resource 404s.
+ */
+export function describeApiError(
+  error: CloudGuardAPIError,
+  resourceLabel: string,
+): { title: string; message: string } {
+  switch (error.kind) {
+    case "network":
+      return {
+        title: "CloudGuard API unreachable",
+        message:
+          "No response from the CloudGuard API. "
+          + "Check that the API service is running, "
+          + "then retry.",
+      };
+    case "timeout":
+      return {
+        title: "Request timed out",
+        message:
+          `Loading ${resourceLabel} took too long. `
+          + "The API may still be processing — retry "
+          + "in a few seconds.",
+      };
+    case "not_found":
+      return {
+        title: "Data not found",
+        message:
+          `The requested ${resourceLabel} was not `
+          + "found. The scan may have been removed or "
+          + "may not have finished writing its results.",
+      };
+    case "rate_limited":
+      return {
+        title: "Too many requests",
+        message:
+          "CloudGuard is rate limiting requests. "
+          + "Wait a moment, then retry.",
+      };
+    case "server":
+      return {
+        title: "CloudGuard API error",
+        message:
+          `The API failed while loading ${resourceLabel} `
+          + `(HTTP ${error.status}). See the API log for `
+          + "details.",
+      };
+    case "client":
+      return {
+        title: "Request rejected",
+        message:
+          `The API rejected the request for `
+          + `${resourceLabel} (HTTP ${error.status}).`,
+      };
+    case "parse":
+      return {
+        title: "Unexpected response",
+        message:
+          `The API returned a response CloudGuard could `
+          + `not read while loading ${resourceLabel}.`,
+      };
+    default:
+      return {
+        title: "Something went wrong",
+        message:
+          `Loading ${resourceLabel} failed. Please retry.`,
+      };
   }
 }
 
@@ -97,11 +217,17 @@ async function request<T>(
       ) {
         throw new CloudGuardAPIError(
           "CloudGuard API request timed out.",
+          0,
+          null,
+          "timeout",
         );
       }
 
       throw new CloudGuardAPIError(
         "Unable to connect to the CloudGuard API.",
+        0,
+        null,
+        "network",
       );
     }
 
@@ -169,6 +295,7 @@ async function request<T>(
         "CloudGuard API returned an unexpected response format.",
         response.status,
         requestId,
+        "parse",
       );
     }
 
@@ -179,6 +306,7 @@ async function request<T>(
         "CloudGuard API returned invalid JSON.",
         response.status,
         requestId,
+        "parse",
       );
     }
   } catch (error) {

@@ -1,0 +1,560 @@
+/* ============================================
+   Overview page — security command dashboard
+   ============================================ */
+
+.overview-hero,
+.overview-grid {
+  margin-bottom: var(--s-5);
+}
+
+.topbar-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* --- Hero: gauge + stats --- */
+
+.overview-hero {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: stretch;
+}
+
+.overview-hero .stat-grid {
+  align-content: start;
+}
+
+/* --- Risk gauge card --- */
+
+.risk-gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  text-align: center;
+}
+
+.risk-gauge-head {
+  align-self: stretch;
+  text-align: left;
+}
+
+.risk-gauge {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  margin-top: var(--s-1);
+}
+
+.risk-ring {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.risk-ring-track {
+  fill: none;
+  stroke: var(--bg-inset);
+  stroke-width: 9;
+}
+
+.risk-ring-fill {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset var(--dur-slow) var(--ease-out),
+    stroke var(--dur-base) var(--ease-out);
+}
+
+.risk-ring-fill.band-low { stroke: var(--success); }
+.risk-ring-fill.band-medium { stroke: var(--sev-medium); }
+.risk-ring-fill.band-high { stroke: var(--sev-high); }
+.risk-ring-fill.band-critical { stroke: var(--sev-critical); }
+
+.risk-gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.risk-gauge-value {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.risk-gauge-max {
+  margin-top: 3px;
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+.risk-gauge-delta {
+  font-size: var(--fs-secondary);
+  color: var(--text-muted);
+  max-width: 30ch;
+}
+
+.risk-gauge-delta.tone-success { color: var(--success); }
+.risk-gauge-delta.tone-danger { color: var(--danger); }
+
+/* --- Shared grid for the panel rows --- */
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--s-5);
+}
+
+.overview-grid > * {
+  min-width: 0;
+}
+
+.g-severity { grid-column: span 4; }
+.g-attack { grid-column: span 5; }
+.g-exposure { grid-column: span 3; }
+.g-fix { grid-column: span 5; }
+.g-issue { grid-column: span 4; }
+.g-scan { grid-column: span 3; }
+
+.overview-grid > .skeleton-card {
+  grid-column: span 4;
+}
+
+/* --- Panel action row (ghost links) --- */
+
+.panel-actions {
+  margin-top: var(--s-4);
+}
+
+/* --- Quiet success/info note inside panels --- */
+
+.card-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+}
+
+.card-note .icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--success);
+}
+
+/* --- Severity distribution --- */
+
+.sev-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.sev-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.sev-row-name {
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sev-row-track {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+
+.sev-row-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.sev-row-fill.critical { background: var(--sev-critical); }
+.sev-row-fill.high { background: var(--sev-high); }
+.sev-row-fill.medium { background: var(--sev-medium); }
+.sev-row-fill.low { background: var(--sev-low); }
+.sev-row-fill.info { background: var(--sev-info); }
+
+.sev-row-count {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* --- Attack path chain --- */
+
+.chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--s-2);
+}
+
+.chain-node {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 180px;
+  padding: 6px var(--s-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
+}
+
+.chain-node-kind {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.chain-node-id {
+  font-size: var(--fs-secondary);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.chain-node.sensitive {
+  border-color: rgba(255, 92, 122, 0.4);
+  background: var(--sev-critical-soft);
+}
+
+.chain-node.sensitive .chain-node-kind {
+  color: var(--sev-critical);
+}
+
+.chain-edge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  color: var(--text-muted);
+}
+
+.chain-edge-label {
+  font-size: 0.625rem;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.chain-explanation {
+  margin-top: var(--s-4);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+}
+
+.chain-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  margin-top: var(--s-3);
+  font-size: var(--fs-secondary);
+  color: var(--text-muted);
+}
+
+.chain-meta strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Exposure summary --- */
+
+.exposure-body {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--s-2);
+  padding-bottom: var(--s-2);
+}
+
+.exposure-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.exposure-row:last-child {
+  border-bottom: none;
+}
+
+.exposure-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.exposure-label .icon {
+  color: var(--text-muted);
+}
+
+.exposure-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.exposure-dim {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.exposure-chips {
+  justify-content: flex-end;
+}
+
+.exposure-account {
+  max-width: 55%;
+  text-align: right;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+/* --- Fix-first card --- */
+
+.fix-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.fix-title {
+  font-size: var(--fs-card-title);
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.fix-desc {
+  margin-top: var(--s-2);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+}
+
+.fix-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+
+.fix-metric {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-inset);
+  min-width: 0;
+}
+
+.fix-metric-label {
+  display: block;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.fix-metric-value {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-section);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.fix-resources {
+  margin-top: var(--s-3);
+}
+
+.fix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin-top: var(--s-5);
+}
+
+/* --- Top issue card --- */
+
+.issue-title {
+  font-size: var(--fs-card-title);
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.issue-risk {
+  margin-top: var(--s-3);
+}
+
+.issue-desc {
+  margin-top: var(--s-3);
+  margin-bottom: var(--s-3);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Scan status card --- */
+
+.scan-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.scan-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.scan-meta-row:last-child {
+  border-bottom: none;
+}
+
+.scan-meta-label {
+  flex-shrink: 0;
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.scan-meta-value {
+  min-width: 0;
+  font-size: var(--fs-secondary);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.scan-meta-value.scan-id {
+  display: block;
+  max-width: 150px;
+}
+
+/* --- Previous-scan delta block --- */
+
+.delta-block {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.delta-title {
+  margin-bottom: var(--s-2);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.delta-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.delta-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+}
+
+.delta-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.delta-tone-success { color: var(--success); font-weight: 600; }
+.delta-tone-danger { color: var(--danger); font-weight: 600; }
+.delta-tone-neutral { color: var(--text-secondary); font-weight: 600; }
+
+.delta-empty {
+  font-size: var(--fs-secondary);
+  color: var(--text-muted);
+}
+
+.delta-basis {
+  margin-top: var(--s-1);
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1280px) {
+  .overview-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .g-severity,
+  .g-attack,
+  .g-fix,
+  .g-issue {
+    grid-column: span 6;
+  }
+
+  .g-exposure,
+  .g-scan {
+    grid-column: span 12;
+  }
+
+  .overview-grid > .skeleton-card {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 768px) {
+  .g-severity,
+  .g-attack,
+  .g-exposure,
+  .g-fix,
+  .g-issue,
+  .g-scan,
+  .overview-grid > .skeleton-card {
+    grid-column: span 12;
+  }
+
+  .risk-gauge-card {
+    align-items: center;
+  }
+}

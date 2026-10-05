@@ -6,7 +6,10 @@ import {
   useState,
 } from "react";
 
-import { CloudGuardAPIError } from "../services/api";
+import {
+  CloudGuardAPIError,
+  isTransientStatus,
+} from "../services/api";
 
 /**
  * Hook state for API queries.
@@ -78,11 +81,14 @@ export function useApiQuery<T>(
       if (err instanceof CloudGuardAPIError) {
         setError(err);
 
-        // Retry logic for transient errors
+        // Retry logic for transient errors (network drops,
+        // rate limiting, overloaded backend, and the startup
+        // race where a scan briefly 404s before its snapshot
+        // is readable). Bounded by retryCount with backoff.
         if (
           isRetry === false &&
           attemptRef.current < retryCount &&
-          (err.status === 429 || err.status === 503 || err.status === 0 || err.status === 504)
+          isTransientStatus(err.status)
         ) {
           attemptRef.current += 1;
           const scheduledFor = attemptRef.current;

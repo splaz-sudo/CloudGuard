@@ -1,0 +1,419 @@
+/* ============================================
+   Reports page — security assessment report
+   Uses global tokens/classes; page-specific
+   layout only.
+   ============================================ */
+
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* --- Executive summary header --- */
+
+.report-exec-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(180px, 1fr)
+  );
+  gap: var(--s-4);
+  margin: 0;
+}
+
+.report-exec-item {
+  min-width: 0;
+}
+
+.report-exec-item dt {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.report-exec-item dd {
+  margin: var(--s-1) 0 0;
+  font-size: var(--fs-body);
+  color: var(--text-primary);
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.report-scope-note {
+  margin-top: var(--s-4);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-secondary);
+  max-width: 96ch;
+}
+
+/* --- Severity distribution bar --- */
+
+.report-sevbar {
+  display: flex;
+  height: 12px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--bg-inset);
+}
+
+.report-sevseg {
+  display: block;
+  height: 100%;
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.report-sevseg.critical {
+  background: var(--sev-critical);
+}
+
+.report-sevseg.high {
+  background: var(--sev-high);
+}
+
+.report-sevseg.medium {
+  background: var(--sev-medium);
+}
+
+.report-sevseg.low {
+  background: var(--sev-low);
+}
+
+.report-sevseg.info {
+  background: var(--sev-info);
+}
+
+.report-sev-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+  margin-top: var(--s-3);
+}
+
+.report-sev-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.report-sev-count {
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Two-column panel rows --- */
+
+.report-two-col {
+  display: grid;
+  grid-template-columns: repeat(
+    2,
+    minmax(0, 1fr)
+  );
+  gap: var(--s-4);
+  align-items: start;
+}
+
+/* --- Key/value summary lists --- */
+
+.report-kv {
+  margin: 0;
+  padding: var(--s-2) var(--s-5) var(--s-3);
+}
+
+.report-kv > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.report-kv > div:last-child {
+  border-bottom: none;
+}
+
+.report-kv dt {
+  font-size: var(--fs-body);
+  color: var(--text-secondary);
+}
+
+.report-kv dd {
+  margin: 0;
+  font-size: var(--fs-body);
+  font-weight: 650;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Finding rows (top list + full list) --- */
+
+.report-top-list,
+.report-findings-list,
+.report-remediation-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--s-3) var(--s-5) var(--s-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.report-top-row,
+.report-finding-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.report-top-row:last-child,
+.report-finding-row:last-child {
+  border-bottom: none;
+}
+
+.report-finding-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.report-finding-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.report-finding-title strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.report-finding-id {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+.report-finding-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.report-finding-score strong {
+  font-size: var(--fs-section);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.report-finding-score span {
+  font-size: var(--fs-meta);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.report-panel-empty {
+  padding: var(--s-5);
+  font-size: var(--fs-secondary);
+}
+
+/* --- Attack path summary --- */
+
+.report-path-intro {
+  font-size: var(--fs-secondary);
+  margin-bottom: var(--s-3);
+}
+
+.report-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.report-path-segment {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.report-path-node {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  max-width: 100%;
+}
+
+.report-path-node code {
+  color: var(--text-primary);
+  font-size: var(--fs-secondary);
+}
+
+.report-path-index {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.report-path-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* --- Remediation summary --- */
+
+.report-remediation-list {
+  gap: var(--s-3);
+}
+
+.report-remediation-list > li {
+  padding: var(--s-3);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.report-remediation-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.report-remediation-head strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* --- Identity / network risk cards --- */
+
+.report-risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+
+.report-risk-card {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4);
+  min-width: 0;
+}
+
+.report-risk-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.report-risk-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.report-risk-name strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.report-risk-name span {
+  font-size: var(--fs-meta);
+}
+
+.report-risk-score {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-shrink: 0;
+}
+
+.report-risk-score strong {
+  font-size: var(--fs-section);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-risk-card ul {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-4);
+  color: var(--text-secondary);
+  font-size: var(--fs-secondary);
+}
+
+.report-risk-card ul li {
+  overflow-wrap: anywhere;
+}
+
+/* --- Limitations --- */
+
+.report-limitations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.report-limitations li {
+  position: relative;
+  padding-left: var(--s-4);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-base);
+  overflow-wrap: anywhere;
+}
+
+.report-limitations li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--info);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1024px) {
+  .report-two-col {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,262 @@
+/* ============================================
+   Compare page — scan-to-scan comparison
+   Uses global tokens/classes; page-specific
+   layout only.
+   ============================================ */
+
+/* --- Scan pickers + compare action --- */
+
+.compare-controls {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    auto
+    minmax(0, 1fr)
+    auto;
+  gap: var(--s-3);
+  align-items: end;
+}
+
+.compare-controls-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  /* optically align with the select boxes,
+     which sit below their labels */
+  padding-bottom: 8px;
+}
+
+.compare-button {
+  min-width: 150px;
+}
+
+.compare-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.compare-hint .icon {
+  flex-shrink: 0;
+}
+
+.compare-hint code {
+  color: var(--text-secondary);
+}
+
+/* --- Headline delta band --- */
+
+.compare-delta {
+  display: grid;
+  grid-template-columns: repeat(
+    3,
+    minmax(0, 1fr)
+  );
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.compare-delta-item {
+  padding: var(--s-5);
+  border-left: 1px solid var(--border-subtle);
+  min-width: 0;
+  animation:
+    compare-fade
+    var(--dur-slow)
+    var(--ease-out)
+    both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.compare-delta-item:first-child {
+  border-left: none;
+}
+
+.compare-delta-values {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+
+.compare-delta-num {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-delta-arrow {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+@keyframes compare-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Resolved / New / Unchanged groups --- */
+
+.compare-groups {
+  display: grid;
+  grid-template-columns: repeat(
+    3,
+    minmax(0, 1fr)
+  );
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.change-group {
+  border-top: 3px solid var(--neutral);
+}
+
+.change-group-resolved {
+  border-top-color: var(--success);
+}
+
+.change-group-new {
+  border-top-color: var(--danger);
+}
+
+.change-group-unchanged {
+  border-top-color: var(--neutral);
+}
+
+.change-group-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.change-group-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+}
+
+.change-group-icon.resolved {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.change-group-icon.new {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.change-group-icon.unchanged {
+  color: var(--neutral);
+  background: var(--neutral-soft);
+}
+
+.change-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.change-item {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--s-3);
+  min-width: 0;
+}
+
+.change-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+
+.change-item-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.change-item-id {
+  display: block;
+  margin-top: var(--s-1);
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+}
+
+.change-risk {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.change-empty {
+  padding: var(--s-5);
+  font-size: var(--fs-secondary);
+}
+
+.compare-note .eyebrow {
+  margin-bottom: var(--s-1);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1100px) {
+  .compare-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .change-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .compare-controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .compare-controls-arrow {
+    padding-bottom: 0;
+    transform: rotate(90deg);
+  }
+
+  .compare-delta {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-delta-item {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .compare-delta-item:first-child {
+    border-top: none;
+  }
+}

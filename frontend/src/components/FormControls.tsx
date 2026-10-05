@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 
+import Icon from "./Icon";
+
 /** Select component with consistent CloudGuard styling */
 export interface SelectProps
   extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange"> {
@@ -119,15 +121,18 @@ Select.displayName = "Select";
 /* SearchInput component */
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
   ({ placeholder = "Search...", onChange, value, className = "", ...props }, ref) => (
-    <input
-      ref={ref}
-      type="search"
-      className={`search-input ${className}`}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange?.(e.target.value)}
-      {...props}
-    />
+    <span className="search-input-wrapper">
+      <Icon name="search" size={14} />
+      <input
+        ref={ref}
+        type="search"
+        className={`search-input ${className}`}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        {...props}
+      />
+    </span>
   ),
 );
 
@@ -255,7 +260,9 @@ export const MultiSelect = ({
           <span className="multiselect-value">
             {value.length > 0 ? selectedLabels : placeholder}
           </span>
-          <span className="multiselect-arrow" aria-hidden="true">▼</span>
+          <span className="multiselect-arrow" aria-hidden="true">
+            <Icon name="chevron-down" size={14} />
+          </span>
         </button>
         {isOpen && (
           <div
@@ -285,7 +292,9 @@ export const MultiSelect = ({
                   onClick={() => handleSelect(option.value)}
                 >
                   <span className="option-check" aria-hidden="true">
-                    {value.includes(option.value) ? "✓" : ""}
+                    {value.includes(option.value)
+                      ? <Icon name="check" size={13} />
+                      : ""}
                   </span>
                   <span className="option-label">{option.label}</span>
                 </button>

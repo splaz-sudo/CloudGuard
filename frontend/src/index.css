@@ -1,5 +1,10 @@
+/* ============================================
+   CloudGuard design tokens
+   ============================================ */
+
 :root {
-  font-family:
+  /* Typography */
+  --font-sans:
     Inter,
     ui-sans-serif,
     system-ui,
@@ -8,10 +13,120 @@
     "Segoe UI",
     sans-serif;
 
-  color: #edf3ff;
-  background: #080d16;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  --font-mono:
+    "SF Mono",
+    "Cascadia Code",
+    "JetBrains Mono",
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+
+  /* Type scale */
+  --fs-page-title: 1.5rem;      /* 24px */
+  --fs-section: 1.0625rem;      /* 17px */
+  --fs-card-title: 0.875rem;    /* 14px */
+  --fs-body: 0.8125rem;         /* 13px */
+  --fs-secondary: 0.75rem;      /* 12px */
+  --fs-meta: 0.6875rem;         /* 11px */
+
+  --lh-tight: 1.25;
+  --lh-base: 1.55;
+
+  /* Surfaces */
+  --bg-app: #070b13;
+  --bg-panel: #0c1322;
+  --bg-elevated: #111a2d;
+  --bg-hover: #16223a;
+  --bg-inset: #090e18;
+  --bg-active: #182742;
+
+  /* Borders */
+  --border-subtle: #1b2740;
+  --border-strong: #2b3c5e;
+  --border-focus: #4f8cff;
+
+  /* Text */
+  --text-primary: #e8eefb;
+  --text-secondary: #97a4bc;
+  --text-muted: #626f88;
+  --text-on-accent: #06101f;
+
+  /* Accent */
+  --accent: #4f8cff;
+  --accent-strong: #7aa9ff;
+  --accent-soft: rgba(79, 140, 255, 0.14);
+  --accent-border: rgba(79, 140, 255, 0.35);
+
+  /* Severity */
+  --sev-critical: #ff5c7a;
+  --sev-critical-soft: rgba(255, 92, 122, 0.13);
+  --sev-high: #ff8a5c;
+  --sev-high-soft: rgba(255, 138, 92, 0.13);
+  --sev-medium: #f2c14e;
+  --sev-medium-soft: rgba(242, 193, 78, 0.13);
+  --sev-low: #54c2ff;
+  --sev-low-soft: rgba(84, 194, 255, 0.12);
+  --sev-info: #8fa0c2;
+  --sev-info-soft: rgba(143, 160, 194, 0.12);
+
+  /* Status */
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --warning: #f2c14e;
+  --warning-soft: rgba(242, 193, 78, 0.12);
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --info: #60a5fa;
+  --info-soft: rgba(96, 165, 250, 0.12);
+  --neutral: #8b98ad;
+  --neutral-soft: rgba(139, 152, 173, 0.12);
+
+  /* Radii */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* Shadows */
+  --shadow-raised: 0 1px 2px rgba(2, 6, 14, 0.45);
+  --shadow-pop:
+    0 8px 24px rgba(2, 6, 14, 0.5),
+    0 2px 6px rgba(2, 6, 14, 0.4);
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 0.9, 0.28, 1);
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --topbar-height: 56px;
+
+  color-scheme: dark;
+}
+
+/* ============================================
+   Base
+   ============================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html,
@@ -22,5 +137,99 @@ body,
 }
 
 body {
+  margin: 0;
   min-height: 100vh;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-base);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* Technical identifiers are the only mono text */
+.mono,
+.scan-id,
+.finding-id,
+.asset-arn {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #26334e transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #26334e;
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #33446a;
+}
+
+::selection {
+  background: rgba(79, 140, 255, 0.35);
+}
+
+/* Reduced motion: strip nonessential animation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

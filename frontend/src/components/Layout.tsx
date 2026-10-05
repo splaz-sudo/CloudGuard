@@ -3,26 +3,52 @@ import {
   Outlet,
 } from "react-router-dom";
 
+import Icon, { type IconName } from "./Icon";
+
 import { useScanContext } from "../context/ScanContext";
 
 
-function Layout() {
-  const navClass = ({
-    isActive,
-  }: {
-    isActive: boolean;
-  }) =>
-    `nav-item ${isActive ? "active" : ""}`;
+type NavItem = {
+  to: string;
+  label: string;
+  icon: IconName;
+  end?: boolean;
+};
 
+
+const NAV_ITEMS: NavItem[] = [
+  { to: "/", label: "Overview", icon: "overview", end: true },
+  { to: "/scans", label: "Scans", icon: "scans" },
+  { to: "/compare", label: "Compare", icon: "swap" },
+  { to: "/inventory", label: "Inventory", icon: "inventory" },
+  { to: "/attack-paths", label: "Attack Paths", icon: "paths" },
+  { to: "/identity", label: "Identity", icon: "identity" },
+  { to: "/network", label: "Network", icon: "network" },
+  { to: "/findings", label: "Findings", icon: "findings" },
+  { to: "/remediations", label: "Remediate", icon: "remediate" },
+  { to: "/compliance", label: "Compliance", icon: "shield" },
+  { to: "/coverage", label: "Coverage", icon: "coverage" },
+  { to: "/reports", label: "Reports", icon: "reports" },
+];
+
+
+function Layout() {
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">
-            CG
+          <div
+            className="brand-mark"
+            aria-hidden="true"
+          >
+            <Icon name="shield" size={20} />
           </div>
 
-          <div>
+          <div className="brand-text">
             <h1>CloudGuard</h1>
             <span>Cloud Security</span>
           </div>
@@ -30,109 +56,42 @@ function Layout() {
 
         <ScanSelector />
 
-        <nav className="navigation">
-          <NavLink
-            to="/"
-            end
-            className={navClass}
-          >
-            Overview
-          </NavLink>
-
-          <NavLink
-            to="/scans"
-            className={navClass}
-          >
-            Scans
-          </NavLink>
-
-          <NavLink
-            to="/compare"
-            className={navClass}
-          >
-            Compare
-          </NavLink>
-
-          <NavLink
-            to="/inventory"
-            className={navClass}
-          >
-            Inventory
-          </NavLink>
-
-          <NavLink
-            to="/attack-paths"
-            className={navClass}
-          >
-            Attack Paths
-          </NavLink>
-
-          <NavLink
-            to="/identity"
-            className={navClass}
-          >
-            Identity
-          </NavLink>
-
-          <NavLink
-            to="/network"
-            className={navClass}
-          >
-            Network
-          </NavLink>
-
-          <NavLink
-            to="/findings"
-            className={navClass}
-          >
-            Findings
-          </NavLink>
-
-          <NavLink
-            to="/remediations"
-            className={navClass}
-          >
-            Remediate
-          </NavLink>
-
-          <NavLink
-            to="/compliance"
-            className={navClass}
-          >
-            Compliance
-          </NavLink>
-
-          <NavLink
-            to="/coverage"
-            className={navClass}
-          >
-            Coverage
-          </NavLink>
-
-          <NavLink
-            to="/reports"
-            className={navClass}
-          >
-            Reports
-          </NavLink>
+        <nav
+          className="navigation"
+          aria-label="Primary"
+        >
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({
+                isActive,
+              }) =>
+                `nav-item${
+                  isActive ? " active" : ""
+                }`
+              }
+            >
+              <Icon name={item.icon} size={16} />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
-          <span className="status-dot" />
-
-          <div>
-            <strong>
-              Analysis Engine
-            </strong>
-
-            <span>
-              Read-only
-            </span>
+          <span
+            className="status-dot"
+            aria-hidden="true"
+          />
+          <div className="sidebar-footer-text">
+            <strong>Analysis Engine</strong>
+            <span>Read-only access</span>
           </div>
         </div>
       </aside>
 
-      <main className="dashboard">
+      <main className="dashboard" id="main">
         <Outlet />
       </main>
     </div>
@@ -151,40 +110,51 @@ function ScanSelector() {
     return null;
   }
 
+  const isLab =
+    selectedScan.source === "local_lab";
+
   return (
     <div className="scan-selector">
-      <label htmlFor="scan-selector">
-        VIEWING SCAN
+      <label
+        className="scan-selector-label"
+        htmlFor="scan-selector"
+      >
+        Viewing scan
       </label>
 
-      <select
-        id="scan-selector"
-        value={selectedScan.scan_id}
-        onChange={(event) => {
-          selectScan(event.target.value);
-        }}
-      >
-        {scans.map((record) => (
-          <option
-            key={record.scan_id}
-            value={record.scan_id}
-          >
-            {formatScanOption(record)}
-          </option>
-        ))}
-      </select>
+      <div className="scan-selector-control">
+        <select
+          id="scan-selector"
+          value={selectedScan.scan_id}
+          onChange={(event) => {
+            selectScan(event.target.value);
+          }}
+        >
+          {scans.map((record) => (
+            <option
+              key={record.scan_id}
+              value={record.scan_id}
+            >
+              {formatScanOption(record)}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <span
-        className={
-          `scan-source-badge ${
-            selectedScan.source
-          }`
-        }
-      >
-        {selectedScan.source === "local_lab"
-          ? "LOCAL LAB"
-          : "AWS SCAN"}
-      </span>
+      <div className="scan-selector-meta">
+        <span
+          className={
+            `scan-source-badge ${
+              isLab ? "local_lab" : "aws"
+            }`
+          }
+        >
+          {isLab ? "LOCAL LAB" : "AWS SCAN"}
+        </span>
+        <span className="scan-selector-id mono">
+          {selectedScan.scan_id.slice(0, 13)}
+        </span>
+      </div>
     </div>
   );
 }

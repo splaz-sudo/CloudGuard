@@ -1,0 +1,156 @@
+/* ============================================
+   Coverage page — collection coverage dashboard
+   Uses global tokens/classes; page-specific
+   layout only.
+   ============================================ */
+
+/* --- Summary stat tones (paired with text
+      labels, never color-only) --- */
+
+.coverage-stats .tone-success {
+  color: var(--success);
+}
+
+.coverage-stats .tone-warning {
+  color: var(--warning);
+}
+
+.coverage-stats .tone-danger {
+  color: var(--danger);
+}
+
+/* --- Collection health: segmented bar --- */
+
+.coverage-segbar {
+  display: flex;
+  height: 12px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--bg-inset);
+}
+
+.coverage-seg {
+  display: block;
+  height: 100%;
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.coverage-seg.success {
+  background: var(--success);
+}
+
+.coverage-seg.partial {
+  background: var(--warning);
+}
+
+.coverage-seg.failed {
+  background: var(--danger);
+}
+
+.coverage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  margin-top: var(--s-3);
+}
+
+.coverage-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.coverage-swatch.success {
+  background: var(--success);
+}
+
+.coverage-swatch.partial {
+  background: var(--warning);
+}
+
+.coverage-swatch.failed {
+  background: var(--danger);
+}
+
+/* --- Collector results table --- */
+
+.coverage-table th.num {
+  text-align: right;
+}
+
+.coverage-collector {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.coverage-detail-cell {
+  max-width: 340px;
+}
+
+.coverage-detail-cell .truncate {
+  display: block;
+}
+
+.coverage-cell-error {
+  color: var(--danger);
+}
+
+.coverage-cell-warn {
+  color: var(--warning);
+}
+
+/* --- Limitations list --- */
+
+.coverage-limitations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.coverage-limitations li {
+  position: relative;
+  padding-left: var(--s-4);
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  line-height: var(--lh-base);
+}
+
+.coverage-limitations li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--info);
+}
+
+.coverage-limitations strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 768px) {
+  .coverage-detail-cell {
+    max-width: 220px;
+  }
+}
