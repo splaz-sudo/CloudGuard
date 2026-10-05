@@ -17,15 +17,6 @@ import type {
 } from "../types/cloudguard";
 
 
-type SeverityFilter =
-  | "all"
-  | "critical"
-  | "high"
-  | "medium"
-  | "low"
-  | "info";
-
-
 function Findings() {
   const { selectedScan } =
     useScanContext();
@@ -44,6 +35,14 @@ function Findings() {
   const [severityFilter, setSeverityFilter] =
     useState<SeverityFilter>("all");
 
+  const [categoryFilter, setCategoryFilter] =
+    useState<string[]>([]);
+
+  const [regionFilter, setRegionFilter] =
+    useState<string[]>([]);
+
+// Status filter removed - comparison feature not active
+
   const [search, setSearch] =
     useState("");
 
@@ -53,13 +52,15 @@ function Findings() {
   const [error, setError] =
     useState<string | null>(null);
 
+// Comparison state removed - feature not active
+
 
   useEffect(() => {
     if (!scanId) {
       return;
     }
 
-    const currentScanId: string = scanId;
+    const currentScanId = scanId;
 
     async function loadFindings() {
       setLoading(true);
@@ -99,6 +100,32 @@ function Findings() {
     loadFindings();
   }, [scanId]);
 
+  // Get available categories from findings
+  const availableCategories = useMemo(
+    () => [
+      ...new Set(findings.map((f) => f.category)),
+    ].sort(),
+    [findings],
+  );
+
+  // Get available regions from findings (via affected assets)
+  const availableRegions = useMemo(
+    () => [
+      ...new Set(
+        findings
+          .flatMap((f) =>
+            f.affected_assets
+              .map((a) => a.split(":")[0])
+          )
+          .filter((r) => r)
+      ),
+    ].sort(),
+    [findings],
+  );
+
+// Use findings directly since comparison feature is not active
+  const findingsWithStatus = findings;
+
 
   const metrics = useMemo(() => {
     const countSeverity = (
@@ -126,13 +153,30 @@ function Findings() {
     const query =
       search.trim().toLowerCase();
 
-    return findings.filter(
+    return findingsWithStatus.filter(
       (finding) => {
         const severityMatches =
           severityFilter === "all" ||
           finding.severity
             .toLowerCase() ===
             severityFilter;
+
+        const categoryMatches =
+          categoryFilter.length === 0 ||
+          categoryFilter.includes(
+            finding.category,
+          );
+
+        const regionMatches =
+          regionFilter.length === 0 ||
+          finding.affected_assets.some(
+            (asset) =>
+              regionFilter.some((r) =>
+                asset.toLowerCase().startsWith(r.toLowerCase()),
+              ),
+          );
+
+        const statusMatches = true;
 
         const searchMatches =
           !query ||
@@ -154,14 +198,19 @@ function Findings() {
 
         return (
           severityMatches &&
+          categoryMatches &&
+          regionMatches &&
+          statusMatches &&
           searchMatches
         );
       },
     );
   }, [
-    findings,
+    findingsWithStatus,
     search,
     severityFilter,
+    categoryFilter,
+    regionFilter,
   ]);
 
 
@@ -209,6 +258,8 @@ function Findings() {
       </header>
 
 
+// Comparison banner removed - comparison feature not active
+
       <section className="findings-metrics">
         <FindingMetric
           label="Critical"
@@ -239,7 +290,7 @@ function Findings() {
         <input
           type="search"
           className="findings-search"
-          placeholder="Search findings..."
+          placeholder="Search findings by title, ID, category, evidence..."
           value={search}
           onChange={(event) =>
             setSearch(
@@ -249,38 +300,84 @@ function Findings() {
         />
 
         <div className="findings-filters">
-          {(
-            [
-              "all",
-              "critical",
-              "high",
-              "medium",
-              "low",
-              "info",
-            ] as SeverityFilter[]
-          ).map((severity) => (
-            <button
-              key={severity}
-              type="button"
-              className={
-                severityFilter ===
-                severity
-                  ? (
-                    "finding-filter " +
-                    "active"
-                  )
-                  : "finding-filter"
-              }
-              onClick={() =>
+          <div className="filter-group">
+            <label>Severity</label>
+            <select
+              value={severityFilter}
+              onChange={(e) =>
                 setSeverityFilter(
-                  severity,
+                  e.target.value as SeverityFilter,
                 )
               }
             >
-              {severity.toUpperCase()}
-            </button>
-          ))}
+              <option value="all">All</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+              <option value="info">Info</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label>Category</label>
+            <select
+              className="filter-multi"
+              multiple
+              value={categoryFilter}
+              onChange={(e) =>
+                setCategoryFilter(
+                  Array.from(
+                    e.target.selectedOptions,
+                    (o) => o.value,
+                  ),
+                )
+              }
+            >
+              {availableCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label>Region</label>
+            <select
+              className="filter-multi"
+              multiple
+              value={regionFilter}
+              onChange={(e) =>
+                setRegionFilter(
+                  Array.from(
+                    e.target.selectedOptions,
+                    (o) => o.value,
+                  ),
+                )
+              }
+            >
+              {availableRegions.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+
         </div>
+
+        <input
+          type="search"
+          className="findings-search"
+          placeholder="Search findings..."
+          value={search}
+          onChange={(event) =>
+            setSearch(
+              event.target.value,
+            )
+          }
+        />
       </section>
 
 
@@ -298,7 +395,8 @@ function Findings() {
             </div>
 
             <span>
-              {filteredFindings.length}
+              {filteredFindings.length} /{" "}
+              {findings.length} findings
             </span>
           </div>
 
@@ -313,9 +411,9 @@ function Findings() {
                     selectedFinding?.id ===
                     finding.id
                       ? (
-                        "finding-list-item " +
-                        "selected"
-                      )
+                          "finding-list-item " +
+                          "selected"
+                        )
                       : "finding-list-item"
                   }
                   onClick={() =>
@@ -336,6 +434,19 @@ function Findings() {
                       >
                         {finding.severity}
                       </span>
+
+                      {finding.comparisonStatus && (
+                        <span
+                          className={
+                            `finding-status ${
+                              finding.comparisonStatus
+                            }`
+                          }
+                        >
+                          {finding.comparisonStatus
+                            .toUpperCase()}
+                        </span>
+                      )}
 
                       <span className="finding-category">
                         {formatCategory(
@@ -397,6 +508,15 @@ function Findings() {
 }
 
 
+type SeverityFilter =
+  | "all"
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "info";
+
+
 function FindingMetric({
   label,
   value,
@@ -424,9 +544,24 @@ function FindingDetails({
 }: {
   finding: Finding;
 }) {
+  // Determine status badge
+  const statusBadge = finding.comparisonStatus
+    ? (
+        <span
+          className={
+            `finding-status ${
+              finding.comparisonStatus
+            }`
+          }
+        >
+          {finding.comparisonStatus.toUpperCase()}
+        </span>
+      )
+    : null;
+
   return (
-    <>
-      <div className="finding-detail-header">
+    <div className="finding-details">
+        <div className="finding-detail-header">
         <div>
           <div className="finding-detail-badges">
             <span
@@ -445,6 +580,8 @@ function FindingDetails({
                 finding.category,
               )}
             </span>
+
+            {statusBadge}
           </div>
 
           <h3>
@@ -456,15 +593,14 @@ function FindingDetails({
           </p>
         </div>
 
-        <div className="finding-risk-score">
-          <span>
-            Risk Score
-          </span>
+      <div className="finding-risk-score">
+        <span>
+          Risk Score
+        </span>
 
-          <strong>
-            {finding.risk_score}
-          </strong>
-        </div>
+        <strong>
+          {finding.risk_score}
+        </strong>
       </div>
 
 
@@ -549,6 +685,28 @@ function FindingDetails({
       </div>
 
 
+      <div className="finding-section">
+        <p className="details-section-title">
+          Recommended Remediation
+        </p>
+
+        {finding.remediation ? (
+          <div className="finding-remediation">
+            <span>✓</span>
+
+            <p>
+              {finding.remediation}
+            </p>
+          </div>
+        ) : (
+          <p className="details-text">
+            No remediation guidance is
+            currently available.
+          </p>
+        )}
+      </div>
+
+
       <div className="finding-context">
         <div>
           <span>Category</span>
@@ -583,8 +741,29 @@ function FindingDetails({
             {finding.evidence.length}
           </strong>
         </div>
+
+        {finding.comparisonStatus && (
+          <div>
+            <span>Status</span>
+
+            <strong>
+              <span
+                className={
+                  `finding-status ${
+                    finding.comparisonStatus
+                  }`
+                }
+              >
+                {finding.comparisonStatus.toUpperCase()}
+              </span>
+            </strong>
+          </div>
+        )}
+
+// Comparison scan reference removed - comparison feature not active
       </div>
-    </>
+    </div>
+    </div>
   );
 }
 

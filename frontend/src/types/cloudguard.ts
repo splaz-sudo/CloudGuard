@@ -62,6 +62,7 @@ export interface Finding {
   evidence: string[];
   remediation: string | null;
   risk_score: number;
+  comparisonStatus?: ChangeStatus;
 }
 
 
