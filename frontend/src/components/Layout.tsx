@@ -15,20 +15,44 @@ type NavItem = {
   end?: boolean;
 };
 
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
 
-const NAV_ITEMS: NavItem[] = [
-  { to: "/", label: "Overview", icon: "overview", end: true },
-  { to: "/scans", label: "Scans", icon: "scans" },
-  { to: "/compare", label: "Compare", icon: "swap" },
-  { to: "/inventory", label: "Inventory", icon: "inventory" },
-  { to: "/attack-paths", label: "Attack Paths", icon: "paths" },
-  { to: "/identity", label: "Identity", icon: "identity" },
-  { to: "/network", label: "Network", icon: "network" },
-  { to: "/findings", label: "Findings", icon: "findings" },
-  { to: "/remediations", label: "Remediate", icon: "remediate" },
-  { to: "/compliance", label: "Compliance", icon: "shield" },
-  { to: "/coverage", label: "Coverage", icon: "coverage" },
-  { to: "/reports", label: "Reports", icon: "reports" },
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "COMMAND",
+    items: [
+      { to: "/", label: "Overview", icon: "overview", end: true },
+      { to: "/scans", label: "Scans", icon: "scans" },
+      { to: "/compare", label: "Compare", icon: "swap" },
+    ],
+  },
+  {
+    label: "ANALYZE",
+    items: [
+      { to: "/inventory", label: "Inventory", icon: "inventory" },
+      { to: "/attack-paths", label: "Attack Paths", icon: "paths" },
+      { to: "/identity", label: "Identity", icon: "identity" },
+      { to: "/network", label: "Network", icon: "network" },
+      { to: "/findings", label: "Findings", icon: "findings" },
+    ],
+  },
+  {
+    label: "RESPOND",
+    items: [
+      { to: "/remediations", label: "Remediate", icon: "remediate" },
+    ],
+  },
+  {
+    label: "ASSURANCE",
+    items: [
+      { to: "/compliance", label: "Compliance", icon: "shield" },
+      { to: "/coverage", label: "Coverage", icon: "coverage" },
+      { to: "/reports", label: "Reports", icon: "reports" },
+    ],
+  },
 ];
 
 
@@ -50,7 +74,7 @@ function Layout() {
 
           <div className="brand-text">
             <h1>CloudGuard</h1>
-            <span>Cloud Security</span>
+            <span>Security Intelligence</span>
           </div>
         </div>
 
@@ -60,22 +84,23 @@ function Layout() {
           className="navigation"
           aria-label="Primary"
         >
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({
-                isActive,
-              }) =>
-                `nav-item${
-                  isActive ? " active" : ""
-                }`
-              }
-            >
-              <Icon name={item.icon} size={16} />
-              <span>{item.label}</span>
-            </NavLink>
+          {NAV_GROUPS.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-group-label">{group.label}</span>
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `nav-item${isActive ? " active" : ""}`
+                  }
+                >
+                  <Icon name={item.icon} size={16} />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -119,7 +144,7 @@ function ScanSelector() {
         className="scan-selector-label"
         htmlFor="scan-selector"
       >
-        Viewing scan
+        Active Scan
       </label>
 
       <div className="scan-selector-control">
@@ -155,6 +180,26 @@ function ScanSelector() {
           {selectedScan.scan_id.slice(0, 13)}
         </span>
       </div>
+
+      {selectedScan.highest_risk !== null && selectedScan.highest_risk !== undefined && (
+        <div className="scan-selector-risk">
+          <span className="scan-selector-risk-label">Risk</span>
+          <div className="scan-selector-risk-bar">
+            <div
+              className={`riskbar-fill sev-${
+                selectedScan.highest_risk >= 75 ? "critical" :
+                selectedScan.highest_risk >= 50 ? "high" :
+                selectedScan.highest_risk >= 25 ? "medium" :
+                "low"
+              }`}
+              style={{
+                width: `${Math.max(0, Math.min(100, Number(selectedScan.highest_risk) || 0))}%`,
+              }}
+            />
+          </div>
+          <span className="scan-selector-risk-value">{selectedScan.highest_risk}</span>
+        </div>
+      )}
     </div>
   );
 }
