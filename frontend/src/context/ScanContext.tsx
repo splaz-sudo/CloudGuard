@@ -30,6 +30,15 @@ type ScanContextValue = {
   startLocalLabScan: (
     environment?: string,
   ) => Promise<ScanRecord | null>;
+  /**
+   * Runs a Real AWS assessment (read-only on the server). Resolves with the
+   * persisted scan record - which may have status "failed" with a
+   * credential-safe error_message - or rejects with a CloudGuardAPIError when
+   * the request itself fails. Never touches the global scan-list error state.
+   */
+  startAwsScan: (
+    regions: string[],
+  ) => Promise<ScanRecord>;
   // Helper functions for UI display
   getSourceLabel: (source: ScanSource) => string;
   getStatusLabel: (status: string) => { label: string; variant: "success" | "warning" | "error" | "info" };
@@ -163,6 +172,33 @@ export function ScanProvider({
   );
 
 
+  const startAwsScan = useCallback(
+    async (regions: string[]): Promise<ScanRecord> => {
+      let record: ScanRecord;
+
+      try {
+        record = await createScan({
+          source: "aws",
+          regions,
+        });
+      } finally {
+        // Failed scans are persisted too; always show them in history.
+        await refreshScans();
+      }
+
+      if (
+        record.status === "completed"
+        || record.status === "partial"
+      ) {
+        setSelectedScanId(record.scan_id);
+      }
+
+      return record;
+    },
+    [refreshScans],
+  );
+
+
   const selectedScan = useMemo(
     () =>
       scans.find(
@@ -231,6 +267,7 @@ export function ScanProvider({
       refreshScans,
       selectScan,
       startLocalLabScan,
+      startAwsScan,
       // Helper functions for UI
       getSourceLabel,
       getStatusLabel,
@@ -246,6 +283,7 @@ export function ScanProvider({
       refreshScans,
       selectScan,
       startLocalLabScan,
+      startAwsScan,
     ],
   );
 

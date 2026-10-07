@@ -104,3 +104,127 @@
     min-width: 0;
   }
 }
+
+
+/* --- Scan mode toggle + Real AWS panel --- */
+
+.scan-mode-toggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+}
+
+.scan-mode-toggle button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  padding: 6px var(--s-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scan-mode-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.scan-mode-toggle button.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+.scan-mode-sub {
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.aws-scan-panel {
+  margin-bottom: var(--s-5);
+}
+
+.aws-scan-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.aws-scan-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding-left: var(--s-5);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-base);
+  color: var(--text-secondary);
+}
+
+.aws-scan-notes code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.aws-scan-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  max-width: 420px;
+}
+
+.aws-scan-label {
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.aws-scan-hint {
+  font-size: var(--fs-meta);
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.aws-scan-error {
+  color: var(--danger);
+}
+
+.aws-scan-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  max-width: 640px;
+  font-size: var(--fs-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.aws-scan-confirm input {
+  margin-top: 3px;
+}
+
+.aws-scan-result {
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border-subtle);
+  border-left-width: 3px;
+  border-radius: var(--r-sm);
+  background: var(--bg-inset);
+  font-size: var(--fs-secondary);
+}
+
+.aws-scan-result p {
+  margin: var(--s-1) 0 0;
+}
+
+.aws-scan-result.is-ok { border-left-color: var(--success); }
+.aws-scan-result.is-partial { border-left-color: var(--warning); }
+.aws-scan-result.is-failed { border-left-color: var(--danger); }

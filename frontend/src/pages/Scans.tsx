@@ -5,6 +5,7 @@ import {
 } from "react";
 
 import Icon from "../components/Icon";
+import AwsScanPanel from "../components/AwsScanPanel";
 
 import {
   Button,
@@ -20,6 +21,10 @@ import {
 import {
   useScanContext,
 } from "../context/ScanContext";
+
+import {
+  RiskBar,
+} from "../components/visualization";
 
 import type {
   ScanRecord,
@@ -40,13 +45,6 @@ const LOCAL_LAB_SCENARIOS = [
 /* ------------------------------------------
    Helpers
    ------------------------------------------ */
-
-function riskFillClass(score: number): string {
-  if (score >= 75) return "sev-critical";
-  if (score >= 50) return "sev-high";
-  if (score >= 25) return "sev-medium";
-  return "sev-success";
-}
 
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
@@ -92,6 +90,7 @@ function Scans() {
     startLocalLabScan,
   } = useScanContext();
 
+  const [mode, setMode] = useState<"local" | "aws">("local");
   const [scenario, setScenario] = useState(LOCAL_LAB_SCENARIOS[0]);
   const [starting, setStarting] = useState(false);
 
@@ -119,20 +118,51 @@ function Scans() {
         </div>
 
         <div className="scan-run">
-          <Select
-            label="Local lab scenario"
-            aria-label="Local lab scenario"
-            options={LOCAL_LAB_SCENARIOS.map((name) => ({
-              value: name,
-              label: name,
-            }))}
-            value={scenario}
-            onChange={setScenario}
-          />
+          <div
+            className="scan-mode-toggle"
+            role="group"
+            aria-label="Scan mode"
+          >
+            <button
+              type="button"
+              className={mode === "local" ? "active" : ""}
+              aria-pressed={mode === "local"}
+              onClick={() => setMode("local")}
+            >
+              Local Lab
+              <span className="scan-mode-sub">demo</span>
+            </button>
+            <button
+              type="button"
+              className={mode === "aws" ? "active" : ""}
+              aria-pressed={mode === "aws"}
+              onClick={() => setMode("aws")}
+            >
+              Real AWS
+              <span className="scan-mode-sub">read-only</span>
+            </button>
+          </div>
 
-          <RunScanButton starting={starting} onRun={handleRun} />
+          {mode === "local" && (
+            <>
+              <Select
+                label="Local lab scenario"
+                aria-label="Local lab scenario"
+                options={LOCAL_LAB_SCENARIOS.map((name) => ({
+                  value: name,
+                  label: name,
+                }))}
+                value={scenario}
+                onChange={setScenario}
+              />
+
+              <RunScanButton starting={starting} onRun={handleRun} />
+            </>
+          )}
         </div>
       </header>
+
+      {mode === "aws" && <AwsScanPanel />}
 
       {loading ? (
         <ScansSkeleton />
@@ -243,7 +273,6 @@ function ScanRow({
   const statusBadge =
     status.variant === "error" ? "danger" : status.variant;
 
-  const risk = Math.max(0, Math.min(100, record.highest_risk));
   const ago = relativeTime(record.created_at);
 
   function handleKeyDown(
@@ -301,15 +330,14 @@ function ScanRow({
       </td>
 
       <td>
-        <div className="riskbar-with-value">
-          <div className="riskbar">
-            <div
-              className={`riskbar-fill ${riskFillClass(risk)}`}
-              style={{ width: `${risk}%` }}
-            />
-          </div>
-          <span className="riskbar-value">{record.highest_risk}</span>
-        </div>
+        <RiskBar
+          score={record.highest_risk}
+          max={100}
+          showValue={true}
+          showLabel={false}
+          height={6}
+          width="100%"
+        />
       </td>
 
       <td className="cell-num">{record.asset_count}</td>
