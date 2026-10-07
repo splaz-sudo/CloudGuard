@@ -16,6 +16,11 @@ import { useScanContext } from "../context/ScanContext";
 import { useApiQuery } from "../hooks/useApiQuery";
 import { compareScans } from "../services/api";
 
+import {
+  DeltaIndicator,
+  RiskGauge,
+} from "../components/visualization";
+
 import type {
   AttackPathChange,
   ComparisonResult,
@@ -465,6 +470,78 @@ function ComparisonView({
           }
           index={2}
         />
+      </section>
+
+      {/* Visual posture transition: risk gauge morph + delta indicators */}
+      <section
+        className="compare-posture"
+        style={{ "--i": 2 } as CSSProperties}
+        aria-label="Posture transition"
+      >
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">POSTURE TRANSITION</p>
+              <h3 className="panel-title">Scan A → Scan B</h3>
+            </div>
+          </div>
+          <div className="panel-body compare-posture-body">
+            <div className="compare-posture-gauges">
+              <div className="compare-posture-gauge">
+                <RiskGauge
+                  score={comparison.risk_before}
+                  size={100}
+                  strokeWidth={7}
+                  showLabel={false}
+                  showValue={true}
+                />
+                <span className="compare-posture-label">Scan A (Baseline)</span>
+              </div>
+
+              <div className="compare-posture-connector">
+                <Icon name="chevron-right" size={20} />
+                <span className={`compare-posture-delta tone-${improved ? "success" : regressed ? "danger" : "neutral"}`}>
+                  {comparison.risk_delta > 0 ? `+${comparison.risk_delta}` : comparison.risk_delta < 0 ? `${comparison.risk_delta}` : "±0"}
+                </span>
+              </div>
+
+              <div className="compare-posture-gauge">
+                <RiskGauge
+                  score={comparison.risk_after}
+                  size={100}
+                  strokeWidth={7}
+                  showLabel={false}
+                  showValue={true}
+                />
+                <span className="compare-posture-label">Scan B (Current)</span>
+              </div>
+            </div>
+
+            <div className="compare-posture-deltas">
+              <DeltaIndicator
+                before={comparison.risk_before}
+                after={comparison.risk_after}
+                label="Risk"
+                max={100}
+                showValues={true}
+              />
+              <DeltaIndicator
+                before={comparison.findings_before}
+                after={comparison.findings_after}
+                label="Findings"
+                max={Math.max(comparison.findings_before, comparison.findings_after, 1)}
+                showValues={true}
+              />
+              <DeltaIndicator
+                before={comparison.paths_before}
+                after={comparison.paths_after}
+                label="Attack paths"
+                max={Math.max(comparison.paths_before, comparison.paths_after, 1)}
+                showValues={true}
+              />
+            </div>
+          </div>
+        </article>
       </section>
 
       {nothingChanged ? (

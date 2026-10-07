@@ -1,26 +1,46 @@
-/* ============================================
-   Overview page — security command dashboard
-   ============================================ */
+/* Top Security Status Strip — dense metric row */
 
-.overview-hero,
-.overview-grid {
+.top-status-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-3);
   margin-bottom: var(--s-5);
 }
 
-.topbar-badges {
+.top-status-strip .metric-strip {
+  min-height: 80px;
+}
+
+/* Overview risk panel */
+
+.overview-risk-panel {
+  grid-column: span 3;
+}
+
+.overview-risk-body {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--s-2);
-  flex-wrap: wrap;
+  gap: var(--s-4);
+  padding: var(--s-5);
+}
+
+.overview-risk-delta {
+  width: 100%;
+  max-width: 280px;
+}
+
+.overview-risk-delta .delta-indicator {
+  width: 100%;
 }
 
 /* --- Hero: gauge + stats --- */
 
 .overview-hero {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: var(--s-5);
-  align-items: stretch;
+  margin-bottom: var(--s-5);
 }
 
 .overview-hero .stat-grid {

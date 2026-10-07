@@ -48,6 +48,62 @@
 
 /* --- Headline delta band --- */
 
+.compare-posture {
+  margin-bottom: var(--s-5);
+}
+
+.compare-posture-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.compare-posture-gauges {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+}
+
+.compare-posture-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.compare-posture-label {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.compare-posture-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 60px;
+}
+
+.compare-posture-delta {
+  font-size: var(--fs-section);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-posture-delta.tone-success { color: var(--success); }
+.compare-posture-delta.tone-danger { color: var(--danger); }
+.compare-posture-delta.tone-neutral { color: var(--text-secondary); }
+
+.compare-posture-deltas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+/* --- Headline delta band --- */
+
 .compare-delta {
   display: grid;
   grid-template-columns: repeat(

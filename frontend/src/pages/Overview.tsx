@@ -1,12 +1,11 @@
 import {
-  Fragment,
   type CSSProperties,
   type ReactNode,
 } from "react";
 
 import { useNavigate } from "react-router-dom";
 
-import Icon, { type IconName } from "../components/Icon";
+import Icon from "../components/Icon";
 
 import {
   EmptyState,
@@ -30,6 +29,16 @@ import {
   getScanPrioritizedRemediations,
 } from "../services/api";
 
+import {
+  RiskGauge,
+  SeverityDistribution,
+  MetricStrip,
+  StatCard,
+  DeltaIndicator,
+  AttackPathChain,
+  StatusBadge,
+} from "../components/visualization";
+
 import type {
   AttackPath,
   ComparisonResult,
@@ -37,7 +46,6 @@ import type {
   Overview as ScanOverview,
   Remediation,
   ScanRecord,
-  SeverityCounts,
 } from "../types/cloudguard";
 
 import "../styles/overview.css";
@@ -46,29 +54,6 @@ import "../styles/overview.css";
 /* ------------------------------------------
    Helpers
    ------------------------------------------ */
-
-type RiskBand = "low" | "medium" | "high" | "critical";
-
-const BAND_LABEL: Record<RiskBand, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  critical: "Critical",
-};
-
-const BAND_BADGE: Record<RiskBand, string> = {
-  low: "badge-success",
-  medium: "badge-medium",
-  high: "badge-high",
-  critical: "badge-critical",
-};
-
-function riskBand(score: number): RiskBand {
-  if (score >= 75) return "critical";
-  if (score >= 50) return "high";
-  if (score >= 25) return "medium";
-  return "low";
-}
 
 function severityKey(severity: string): string {
   const key = severity.toLowerCase();
@@ -159,35 +144,6 @@ function findPreviousScan(
   return candidates[0] ?? null;
 }
 
-function nodeKind(node: string): string {
-  const separator = node.indexOf(":");
-  const type = separator === -1 ? node : node.slice(0, separator);
-  switch (type) {
-    case "internet":
-      return "Internet";
-    case "ec2":
-    case "lambda":
-      return "Workload";
-    case "iam_user":
-    case "iam_role":
-      return "Identity";
-    case "s3_bucket":
-    case "rds":
-    case "secret":
-      return "Data store";
-    case "security_group":
-    case "vpc":
-      return "Network";
-    default:
-      return "Asset";
-  }
-}
-
-function nodeLabel(node: string): string {
-  const separator = node.indexOf(":");
-  return separator === -1 ? node : node.slice(separator + 1);
-}
-
 function actionLabel(actionType: string): string {
   return actionType.replace(/_/g, " ").toUpperCase();
 }
@@ -198,54 +154,6 @@ type DeltaInfo = {
   result: ComparisonResult | null;
   retry: () => void;
 };
-
-function riskDeltaText(
-  delta: DeltaInfo,
-  hasPrevious: boolean,
-): { text: string; tone: "success" | "danger" | "neutral" } {
-  if (!hasPrevious) {
-    return {
-      text: "First scan for this environment — no baseline yet.",
-      tone: "neutral",
-    };
-  }
-  if (delta.loading) {
-    return {
-      text: "Comparing with the previous scan…",
-      tone: "neutral",
-    };
-  }
-  if (delta.failed) {
-    return {
-      text: "Comparison with the previous scan is unavailable.",
-      tone: "neutral",
-    };
-  }
-  const value = delta.result?.risk_delta;
-  if (value === null || value === undefined) {
-    return {
-      text: "No comparison data for this scan.",
-      tone: "neutral",
-    };
-  }
-  if (value === 0) {
-    return {
-      text: "Unchanged since the previous scan.",
-      tone: "neutral",
-    };
-  }
-  if (value < 0) {
-    return {
-      text: `Down ${-value} since the previous scan.`,
-      tone: "success",
-    };
-  }
-  return {
-    text: `Up ${value} since the previous scan.`,
-    tone: "danger",
-  };
-}
-
 
 /* ------------------------------------------
    Page
@@ -423,15 +331,95 @@ function Overview() {
         </div>
       </header>
 
+      {/* Top Security Status Strip — dense metric row */}
+      <section
+        className="top-status-strip"
+        style={{ "--i": 0 } as CSSProperties}
+        aria-label="Security posture summary"
+      >
+        <MetricStrip
+          label="Risk Score"
+          value={overview.highest_risk_score}
+          icon="warning"
+          tone={overview.highest_risk_score >= 75 ? "critical" : overview.highest_risk_score >= 50 ? "high" : overview.highest_risk_score >= 25 ? "medium" : "low"}
+          foot="Highest correlated risk"
+        />
+        <MetricStrip
+          label="Assets"
+          value={overview.assets}
+          icon="inventory"
+          foot={`${overview.relationships} relationships`}
+        />
+        <MetricStrip
+          label="Internet Exposed"
+          value={overview.internet_exposed_assets}
+          icon="globe"
+          tone="warning"
+          foot={`${share(overview.internet_exposed_assets, overview.assets)} of assets`}
+        />
+        <MetricStrip
+          label="Findings"
+          value={overview.findings}
+          icon="findings"
+          tone={overview.severity.critical > 0 ? "critical" : overview.severity.high > 0 ? "high" : "info"}
+          foot={`${overview.severity.critical} critical · ${overview.severity.high} high`}
+        />
+        <MetricStrip
+          label="Attack Paths"
+          value={overview.attack_paths}
+          icon="paths"
+          tone={overview.attack_paths > 0 ? "warning" : "success"}
+          foot="Routes to sensitive resources"
+        />
+        <MetricStrip
+          label="Sensitive Assets"
+          value={overview.sensitive_assets}
+          icon="lock"
+          tone="info"
+          foot={`${share(overview.sensitive_assets, overview.assets)} of all assets`}
+        />
+      </section>
+
       <section
         className="overview-hero"
         style={{ "--i": 1 } as CSSProperties}
       >
-        <RiskGaugeCard
-          score={overview.highest_risk_score}
-          delta={deltaInfo}
-          hasPrevious={previousScan !== null}
-        />
+        <article className="panel overview-risk-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">RISK SCORE</p>
+              <h3 className="panel-title">Highest risk in this scan</h3>
+            </div>
+          </div>
+          <div className="panel-body overview-risk-body">
+            <RiskGauge
+              score={overview.highest_risk_score}
+              size={148}
+              strokeWidth={9}
+              showValue={true}
+              animate={true}
+            />
+            <div className="overview-risk-delta">
+              {previousScan ? (
+                delta.loading ? (
+                  <p className="delta-empty">Comparing with the previous scan…</p>
+                ) : delta.error ? (
+                  <p className="delta-empty">Comparison unavailable.</p>
+                ) : delta.data ? (
+                  <DeltaIndicator
+                    before={delta.data.risk_before}
+                    after={delta.data.risk_after}
+                    label="Vs previous scan"
+                    max={100}
+                    showValues={true}
+                  />
+                ) : null
+              ) : (
+                <p className="delta-empty">First scan for this environment — no baseline yet.</p>
+              )}
+            </div>
+          </div>
+        </article>
 
         <div className="stat-grid">
           <StatCard
@@ -471,10 +459,27 @@ function Overview() {
         className="overview-grid"
         style={{ "--i": 2 } as CSSProperties}
       >
-        <SeverityPanel
-          severity={overview.severity}
-          total={overview.findings}
-        />
+        <article className="panel g-severity">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">RISK DISTRIBUTION</p>
+              <h3 className="panel-title">Findings by severity</h3>
+            </div>
+            <StatusBadge variant="neutral" size="sm" showDot={false}>
+              {overview.findings} total
+            </StatusBadge>
+          </div>
+          <div className="panel-body">
+            <SeverityDistribution
+              severity={overview.severity}
+              total={overview.findings}
+              showBars={true}
+              showCounts={true}
+              showLabels={true}
+              compact={false}
+            />
+          </div>
+        </article>
 
         <AttackPathPanel
           path={topPath}
@@ -523,176 +528,12 @@ function Overview() {
 
 
 /* ------------------------------------------
-   Hero: risk gauge + stat cards
+   Row: attack path / exposure / fix / etc.
    ------------------------------------------ */
-
-const RING_RADIUS = 52;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-
-function RiskGaugeCard({
-  score,
-  delta,
-  hasPrevious,
-}: {
-  score: number;
-  delta: DeltaInfo;
-  hasPrevious: boolean;
-}) {
-  const clamped = Math.max(0, Math.min(100, Math.round(score)));
-  const band = riskBand(clamped);
-  const offset = RING_CIRCUMFERENCE * (1 - clamped / 100);
-  const deltaText = riskDeltaText(delta, hasPrevious);
-
-  return (
-    <article className="card risk-gauge-card">
-      <div className="risk-gauge-head">
-        <p className="eyebrow">RISK SCORE</p>
-        <h3 className="card-title">Highest risk in this scan</h3>
-      </div>
-
-      <div className="risk-gauge">
-        <svg
-          className="risk-ring"
-          viewBox="0 0 120 120"
-          role="img"
-          aria-label={
-            `Highest risk score ${clamped} out of 100, `
-            + `${BAND_LABEL[band]} risk`
-          }
-        >
-          <circle
-            className="risk-ring-track"
-            cx={60}
-            cy={60}
-            r={RING_RADIUS}
-          />
-          <circle
-            className={`risk-ring-fill band-${band}`}
-            cx={60}
-            cy={60}
-            r={RING_RADIUS}
-            strokeDasharray={RING_CIRCUMFERENCE}
-            strokeDashoffset={offset}
-            transform="rotate(-90 60 60)"
-          />
-        </svg>
-
-        <div className="risk-gauge-center">
-          <strong className="risk-gauge-value">{clamped}</strong>
-          <span className="risk-gauge-max">/ 100</span>
-        </div>
-      </div>
-
-      <span className={`badge badge-lg ${BAND_BADGE[band]}`}>
-        {BAND_LABEL[band]} risk
-      </span>
-
-      <p className={`risk-gauge-delta tone-${deltaText.tone}`}>
-        {deltaText.text}
-      </p>
-    </article>
-  );
-}
-
-
-function StatCard({
-  icon,
-  label,
-  value,
-  foot,
-}: {
-  icon: IconName;
-  label: string;
-  value: number;
-  foot: string;
-}) {
-  return (
-    <article className="stat">
-      <span className="stat-label">
-        <Icon name={icon} size={13} />
-        {label}
-      </span>
-      <strong className="stat-value">{value}</strong>
-      <span className="stat-foot">{foot}</span>
-    </article>
-  );
-}
-
 
 /* ------------------------------------------
-   Row: severity / attack path / exposure
+   Row: exposure / fix / scan status / etc.
    ------------------------------------------ */
-
-const SEVERITY_ROWS = [
-  { key: "critical", label: "Critical" },
-  { key: "high", label: "High" },
-  { key: "medium", label: "Medium" },
-  { key: "low", label: "Low" },
-  { key: "info", label: "Info" },
-] as const;
-
-function SeverityPanel({
-  severity,
-  total,
-}: {
-  severity: SeverityCounts;
-  total: number;
-}) {
-  const max = Math.max(
-    severity.critical,
-    severity.high,
-    severity.medium,
-    severity.low,
-    severity.info,
-    1,
-  );
-
-  return (
-    <article className="panel g-severity">
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">RISK DISTRIBUTION</p>
-          <h3 className="panel-title">Findings by severity</h3>
-        </div>
-        <span className="badge badge-neutral no-dot">
-          {total} total
-        </span>
-      </div>
-
-      <div className="panel-body">
-        {total === 0 ? (
-          <p className="card-note">
-            <Icon name="check" size={15} />
-            No findings were raised for this scan.
-          </p>
-        ) : (
-          <div className="sev-rows">
-            {SEVERITY_ROWS.map((row) => {
-              const value = severity[row.key];
-              const width = value === 0
-                ? 0
-                : Math.max((value / max) * 100, 4);
-
-              return (
-                <div className="sev-row" key={row.key}>
-                  <span className="sev-row-name">{row.label}</span>
-                  <span className="sev-row-track">
-                    <span
-                      className={`sev-row-fill ${row.key}`}
-                      style={{ width: `${width}%` }}
-                    />
-                  </span>
-                  <span className="sev-row-count">{value}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </article>
-  );
-}
-
 
 function AttackPathPanel({
   path,
@@ -726,47 +567,13 @@ function AttackPathPanel({
           </p>
         ) : (
           <>
-            <div className="chain">
-              {path.nodes.map((node, index) => {
-                const isLast = index === path.nodes.length - 1;
-                const isSensitiveTarget =
-                  isLast && path.sensitive_target;
-                const hop = path.hops[index - 1];
-
-                return (
-                  <Fragment key={`${node}-${index}`}>
-                    {index > 0 && (
-                      <span className="chain-edge">
-                        <span className="chain-edge-label">
-                          {hop
-                            ? hop.relationship_type.replace(/_/g, " ")
-                            : ""}
-                        </span>
-                        <Icon name="chevron-right" size={12} />
-                      </span>
-                    )}
-
-                    <span
-                      className={
-                        `chain-node${
-                          isSensitiveTarget ? " sensitive" : ""
-                        }`
-                      }
-                      title={node}
-                    >
-                      <span className="chain-node-kind">
-                        {isSensitiveTarget
-                          ? "Sensitive target"
-                          : nodeKind(node)}
-                      </span>
-                      <span className="chain-node-id mono">
-                        {nodeLabel(node)}
-                      </span>
-                    </span>
-                  </Fragment>
-                );
-              })}
-            </div>
+            <AttackPathChain
+              nodes={path.nodes}
+              hops={path.hops}
+              sensitiveTarget={path.sensitive_target}
+              compact={true}
+              animate={true}
+            />
 
             <p className="chain-explanation">{path.explanation}</p>
 

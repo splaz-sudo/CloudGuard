@@ -20,6 +20,13 @@ import {
   LoadingState,
 } from "../components/StateBlock";
 
+import {
+  ResourceNode,
+  ResourceChip,
+  normalizeResourceType,
+  StatusBadge,
+} from "../components/visualization";
+
 import "../styles/inventory.css";
 
 
@@ -382,21 +389,21 @@ function Inventory() {
                     {filteredAssets.map((asset) => (
                       <tr key={asset.id}>
                         <td className="asset-cell">
-                          <div className="asset-name">
-                            {asset.name}
-                          </div>
-                          <div
-                            className="asset-id mono wrap-anywhere"
-                            title={asset.id}
-                          >
-                            {asset.id}
-                          </div>
+                          <ResourceNode
+                            type={normalizeResourceType(asset.asset_type)}
+                            name={asset.name}
+                            id={asset.id}
+                            sensitive={asset.sensitive}
+                            internetExposed={asset.internet_exposed}
+                            size="sm"
+                            showType={false}
+                            showRisk={false}
+                            showFlags={false}
+                          />
                         </td>
 
                         <td>
-                          <span className="badge badge-neutral no-dot">
-                            {asset.asset_type}
-                          </span>
+                          <ResourceChip type={normalizeResourceType(asset.asset_type)} name={asset.asset_type} />
                         </td>
 
                         <td>
@@ -405,13 +412,9 @@ function Inventory() {
 
                         <td>
                           {asset.internet_exposed ? (
-                            <span className="badge badge-danger no-dot">
-                              <Icon
-                                name="globe"
-                                size={11}
-                              />
+                            <StatusBadge variant="danger" size="sm" icon="globe" showDot={false}>
                               PUBLIC
-                            </span>
+                            </StatusBadge>
                           ) : (
                             <span className="badge badge-success">
                               PRIVATE
