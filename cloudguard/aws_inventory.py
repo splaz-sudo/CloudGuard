@@ -2,7 +2,7 @@ from cloudguard.collectors.aws_session import AWSSession
 from cloudguard.collectors.ec2 import EC2Collector
 from cloudguard.collectors.iam import IAMCollector
 from cloudguard.collectors.s3 import S3Collector
-from cloudguard.collectors.sts import STSCollector
+from cloudguard.collectors.sts import STSCollector, require_identity
 from cloudguard.normalizers.aws import AWSNormalizer
 
 
@@ -15,7 +15,9 @@ def main() -> None:
         region_name="us-east-1",
     )
 
-    identity = STSCollector(session).get_identity()
+    identity = require_identity(
+        STSCollector(session).get_identity()
+    )
 
     ec2 = EC2Collector(session)
     s3 = S3Collector(session)

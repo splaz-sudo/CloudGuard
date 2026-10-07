@@ -4,7 +4,7 @@ from cloudguard.collectors.aws_session import AWSSession
 from cloudguard.collectors.ec2 import EC2Collector
 from cloudguard.collectors.iam import IAMCollector
 from cloudguard.collectors.s3 import S3Collector
-from cloudguard.collectors.sts import STSCollector
+from cloudguard.collectors.sts import STSCollector, require_identity
 from cloudguard.findings.classifier import ResourceClassifier
 from cloudguard.findings.engine import FindingEngine
 from cloudguard.graph.attack_paths import AttackPathEngine
@@ -26,9 +26,9 @@ def main() -> None:
             region_name="us-east-1",
         )
 
-        identity = STSCollector(
-            session
-        ).get_identity()
+        identity = require_identity(
+            STSCollector(session).get_identity()
+        )
 
         # --------------------------------------------------
         # COLLECTION

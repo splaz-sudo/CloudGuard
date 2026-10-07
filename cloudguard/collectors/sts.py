@@ -77,3 +77,21 @@ class STSCollector:
                     2,
                 ),
             )
+
+
+def require_identity(result: CollectorResult) -> AWSIdentity:
+    """
+    Return the AWSIdentity from a successful STS CollectorResult.
+
+    STSCollector.get_identity() never raises; it reports failure through the
+    result. Callers that need a trustworthy account id (inventory, scans)
+    use this so an STS failure stops the run with a credential-safe message
+    instead of continuing with an unknown or fabricated account.
+    """
+    if result.status != "success" or not result.data:
+        raise RuntimeError(
+            "AWS identity check failed: "
+            + (result.error_message or "no identity was returned")
+        )
+
+    return result.data[0]

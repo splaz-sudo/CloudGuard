@@ -524,6 +524,7 @@ class ScanService:
         )
         from cloudguard.collectors.sts import (
             STSCollector,
+            require_identity,
         )
         from cloudguard.retry import RetryConfig
 
@@ -579,6 +580,10 @@ class ScanService:
                 "AWS identity check failed: "
                 f"{type(e).__name__}"
             ) from None
+
+        # STSCollector never raises; require_identity() turns a failed
+        # result into a credential-safe hard failure (never a fabricated id).
+        identity = require_identity(sts_result)
 
         if not regions:
             regions = [
@@ -908,6 +913,9 @@ class ScanService:
             regions,
             failed_collectors,
             collector_results,
+            regions_completed,
+            regions_partial,
+            regions_failed,
         )
 
     # ------------------------------------------
