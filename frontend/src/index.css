@@ -1,5 +1,5 @@
 /* ============================================
-   CloudGuard design tokens
+   CloudGuard design tokens — Security Console 2.0
    ============================================ */
 
 :root {
@@ -34,24 +34,35 @@
   --lh-tight: 1.25;
   --lh-base: 1.55;
 
-  /* Surfaces */
+  /* Surfaces — layered depth hierarchy */
   --bg-app: #070b13;
+  --bg-workspace: #09101d;
   --bg-panel: #0c1322;
+  --bg-panel-hover: #111a2d;
+  --bg-inspector: #0e1628;
+  --bg-overlay: #0a1220;
   --bg-elevated: #111a2d;
   --bg-hover: #16223a;
   --bg-inset: #090e18;
   --bg-active: #182742;
+  --bg-input: #0d1526;
 
   /* Borders */
   --border-subtle: #1b2740;
+  --border-panel: #20304a;
   --border-strong: #2b3c5e;
   --border-focus: #4f8cff;
+  --border-accent: rgba(79, 140, 255, 0.35);
+  --border-critical: rgba(255, 92, 122, 0.35);
+  --border-warning: rgba(242, 193, 78, 0.35);
+  --border-success: rgba(52, 211, 153, 0.35);
 
   /* Text */
   --text-primary: #e8eefb;
   --text-secondary: #97a4bc;
   --text-muted: #626f88;
   --text-on-accent: #06101f;
+  --text-inverse: #06101f;
 
   /* Accent */
   --accent: #4f8cff;
@@ -59,7 +70,7 @@
   --accent-soft: rgba(79, 140, 255, 0.14);
   --accent-border: rgba(79, 140, 255, 0.35);
 
-  /* Severity */
+  /* Severity — consistent semantics */
   --sev-critical: #ff5c7a;
   --sev-critical-soft: rgba(255, 92, 122, 0.13);
   --sev-high: #ff8a5c;
@@ -83,18 +94,42 @@
   --neutral: #8b98ad;
   --neutral-soft: rgba(139, 152, 173, 0.12);
 
-  /* Radii */
+  /* Simulated / Inferred / Observed */
+  --simulated: #34d399;
+  --simulated-soft: rgba(52, 211, 153, 0.12);
+  --simulated-border: rgba(52, 211, 153, 0.35);
+  --inferred: #8fa0c2;
+  --inferred-soft: rgba(143, 160, 194, 0.12);
+  --inferred-border: rgba(143, 160, 194, 0.3);
+
+  /* Resource type colors */
+  --res-internet: #54c2ff;
+  --res-workload: #4f8cff;
+  --res-identity: #f2c14e;
+  --res-sensitive: #ff5c7a;
+  --res-network: #8fa0c2;
+  --res-data: #a78bfa;
+  --res-unknown: #8b98ad;
+
+  /* Radii — tighter, professional */
   --r-xs: 4px;
   --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-panel: 8px;
+  --r-card: 6px;
   --r-pill: 999px;
 
-  /* Shadows */
-  --shadow-raised: 0 1px 2px rgba(2, 6, 14, 0.45);
+  /* Shadows — depth scale */
+  --shadow-xs: 0 1px 2px rgba(2, 6, 14, 0.35);
+  --shadow-sm: 0 2px 4px rgba(2, 6, 14, 0.4);
+  --shadow-md: 0 4px 12px rgba(2, 6, 14, 0.45);
+  --shadow-lg: 0 8px 24px rgba(2, 6, 14, 0.5);
   --shadow-pop:
-    0 8px 24px rgba(2, 6, 14, 0.5),
-    0 2px 6px rgba(2, 6, 14, 0.4);
+    0 12px 32px rgba(2, 6, 14, 0.55),
+    0 4px 8px rgba(2, 6, 14, 0.4);
+  --shadow-inset: inset 0 1px 2px rgba(2, 6, 14, 0.4);
 
   /* Spacing */
   --s-1: 4px;
@@ -106,15 +141,27 @@
   --s-8: 32px;
   --s-10: 40px;
 
-  /* Motion */
+  /* Motion — purposeful, 120-300ms */
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 280ms;
+  --dur-slower: 400ms;
   --ease-out: cubic-bezier(0.22, 0.9, 0.28, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Specific motion tokens */
+  --dur-graph-trace: 600ms;
+  --dur-risk-interpolate: 400ms;
+  --dur-panel-slide: 200ms;
+  --dur-row-select: 120ms;
+  --dur-expand: 180ms;
+  --dur-sim-transition: 350ms;
 
   /* Layout */
   --sidebar-width: 232px;
+  --sidebar-collapsed: 68px;
   --topbar-height: 56px;
+  --status-strip-height: 44px;
 
   color-scheme: dark;
 }
@@ -222,7 +269,316 @@ pre {
   background: rgba(79, 140, 255, 0.35);
 }
 
-/* Reduced motion: strip nonessential animation */
+/* ============================================
+   Layered surface utilities
+   ============================================ */
+
+.surface-workspace { background: var(--bg-workspace); }
+.surface-panel { background: var(--bg-panel); }
+.surface-panel-hover { background: var(--bg-panel-hover); }
+.surface-inspector { background: var(--bg-inspector); }
+.surface-overlay { background: var(--bg-overlay); }
+.surface-elevated { background: var(--bg-elevated); }
+.surface-input { background: var(--bg-input); }
+
+.border-panel { border-color: var(--border-panel); }
+.border-subtle { border-color: var(--border-subtle); }
+.border-strong { border-color: var(--border-strong); }
+
+/* ============================================
+   Security language utilities — consistent across pages
+   ============================================ */
+
+/* Severity — always paired with text, never color-only */
+.sev-critical { color: var(--sev-critical); }
+.sev-high { color: var(--sev-high); }
+.sev-medium { color: var(--sev-medium); }
+.sev-low { color: var(--sev-low); }
+.sev-info { color: var(--sev-info); }
+
+.sev-critical-bg { background: var(--sev-critical-soft); }
+.sev-high-bg { background: var(--sev-high-soft); }
+.sev-medium-bg { background: var(--sev-medium-soft); }
+.sev-low-bg { background: var(--sev-low-soft); }
+.sev-info-bg { background: var(--sev-info-soft); }
+
+.sev-critical-border { border-color: var(--border-critical); }
+.sev-high-border { border-color: rgba(255, 138, 92, 0.35); }
+.sev-medium-border { border-color: var(--border-warning); }
+.sev-low-border { border-color: rgba(84, 194, 255, 0.3); }
+.sev-info-border { border-color: rgba(143, 160, 194, 0.3); }
+
+/* Status */
+.status-success { color: var(--success); }
+.status-warning { color: var(--warning); }
+.status-danger { color: var(--danger); }
+.status-info { color: var(--info); }
+.status-neutral { color: var(--neutral); }
+
+/* Simulated / Inferred / Observed */
+.state-simulated {
+  color: var(--simulated);
+  background: var(--simulated-soft);
+  border-color: var(--simulated-border);
+}
+.state-inferred {
+  color: var(--inferred);
+  background: var(--inferred-soft);
+  border-color: var(--inferred-border);
+  border-style: dashed;
+}
+.state-observed {
+  color: var(--text-primary);
+}
+
+/* Resource type colors */
+.res-internet { color: var(--res-internet); }
+.res-workload { color: var(--res-workload); }
+.res-identity { color: var(--res-identity); }
+.res-sensitive { color: var(--res-sensitive); }
+.res-network { color: var(--res-network); }
+.res-data { color: var(--res-data); }
+.res-unknown { color: var(--res-unknown); }
+
+.res-internet-bg { background: rgba(84, 194, 255, 0.12); }
+.res-workload-bg { background: var(--accent-soft); }
+.res-identity-bg { background: var(--warning-soft); }
+.res-sensitive-bg { background: var(--sev-critical-soft); }
+.res-network-bg { background: rgba(143, 160, 194, 0.12); }
+.res-data-bg { background: rgba(167, 139, 250, 0.12); }
+
+/* Change status */
+.change-new { color: var(--sev-critical); }
+.change-resolved { color: var(--success); }
+.change-unchanged { color: var(--neutral); }
+.change-partial { color: var(--warning); }
+.change-unknown { color: var(--text-muted); }
+
+/* ============================================
+   Panel chrome — consistent across all pages
+   ============================================ */
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-xs);
+}
+
+.panel-hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--border-strong);
+}
+
+.panel-elevated {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-inspector {
+  background: var(--bg-inspector);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-lg);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--border-panel);
+}
+
+.panel-body {
+  padding: var(--s-5);
+}
+
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-card);
+  padding: var(--s-4);
+  box-shadow: var(--shadow-xs);
+}
+
+.card-hover:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--border-strong);
+}
+
+/* ============================================
+   Motion utilities
+   ============================================ */
+
+.animate-fade-in {
+  animation: fade-in var(--dur-base) var(--ease-out);
+}
+
+.animate-slide-up {
+  animation: slide-up var(--dur-base) var(--ease-out);
+}
+
+.animate-slide-down {
+  animation: slide-down var(--dur-base) var(--ease-out);
+}
+
+.animate-scale-in {
+  animation: scale-in var(--dur-fast) var(--ease-out);
+}
+
+.animate-risk-count {
+  animation: risk-count var(--dur-risk-interpolate) var(--ease-out);
+}
+
+.animate-graph-trace {
+  animation: graph-trace var(--dur-graph-trace) linear infinite;
+}
+
+.animate-sim-transition {
+  animation: sim-transition var(--dur-sim-transition) var(--ease-out);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes risk-count {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+@keyframes graph-trace {
+  to { stroke-dashoffset: -24; }
+}
+
+@keyframes sim-transition {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Staggered entrance for page sections */
+.page-section {
+  animation: slide-up var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(var(--section-index, 0) * 60ms);
+}
+
+/* ============================================
+   Risk gauge / meter utilities
+   ============================================ */
+
+.risk-ring {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--bg-inset);
+  stroke-width: 8;
+}
+
+.ring-fill {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: var(--ring-circumference, 327);
+  stroke-dashoffset: var(--ring-offset, 0);
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-out), stroke var(--dur-base) var(--ease-out);
+}
+
+.ring-fill.critical { stroke: var(--sev-critical); }
+.ring-fill.high { stroke: var(--sev-high); }
+.ring-fill.medium { stroke: var(--sev-medium); }
+.ring-fill.low { stroke: var(--sev-low); }
+.ring-fill.success { stroke: var(--success); }
+
+/* ============================================
+   Status badge — unified across pages
+   ============================================ */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.status-badge.no-dot::before { display: none; }
+
+.status-badge-sm {
+  padding: 1px 6px;
+  font-size: 0.625rem;
+}
+
+.status-badge-lg {
+  padding: 4px 12px;
+  font-size: var(--fs-secondary);
+}
+
+/* ============================================
+   Reduced motion: strip nonessential animation
+   ============================================ */
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
